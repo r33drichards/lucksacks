@@ -5,7 +5,10 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	u "github.com/bcicen/go-units"
 	_ "github.com/joho/godotenv/autoload"
+	"strconv"
+
 	"github.com/slack-go/slack"
 	"io"
 	"io/ioutil"
@@ -185,6 +188,85 @@ func main() {
 					log.Println(err)
 				}
 			}()
+
+		case "/convert":
+			vals := strings.Split(s.Text, " ")
+			from, err := u.Find(vals[1])
+			if err != nil{
+				params := &slack.Msg{Text: vals[1] + " not valid unit"}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+			to, err := u.Find(vals[2])
+			if err != nil{
+				params := &slack.Msg{Text: vals[2] + " not valid unit"}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+
+			val, err := strconv.ParseFloat(vals[0], 64)
+			if err != nil {
+				params := &slack.Msg{Text: vals[0] + " failed to parse"}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+
+			message, err := u.ConvertFloat(val, from, to)
+
+			if err != nil{
+				params := &slack.Msg{Text: "failed to preform conversion for: " + vals[0] + " " + vals[1] + " " + " " + vals[2]}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+
+			}
+
+			params := &slack.Msg{Text: fmt.Sprintf("%s %ss is %s", vals[0], from.Name, message.String())}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
