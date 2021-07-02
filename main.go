@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -440,6 +441,74 @@ func main() {
 			if err != nil {
 				log.Println(err)
 			}
+
+		case "/roll":
+			if s.Text == "" || s.Text == "help" {
+				params := &slack.Msg{Text: `returns a random number between 1 and N
+
+Example:
+
+/roll 6
+
+-> 1
+`,
+				}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+			i, err := strconv.Atoi(s.Text)
+			if err != nil {
+				params := &slack.Msg{Text: "Invalid input: " + s.Text}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+			if i <= 0 {
+				params := &slack.Msg{Text: "provide integer greater than 0"}
+				b, err := json.Marshal(params)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, err = w.Write(b)
+				if err != nil {
+					log.Println(err)
+				}
+				return
+			}
+			rand.Seed(time.Now().UnixNano())
+			randInt := rand.Intn(i) +1
+			params := &slack.Msg{Text: strconv.Itoa(randInt)}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
+			return
+
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
