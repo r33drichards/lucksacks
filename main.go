@@ -425,6 +425,21 @@ func main() {
 			if err != nil {
 				log.Println(err)
 			}
+		case "/yt":
+			splitText := strings.Split(s.Text, "/")
+			ytChannelID := splitText[len(splitText)-1]
+
+			params := &slack.Msg{Text: "```\n/feed add https://www.youtube.com/feeds/videos.xml?channel_id=" + ytChannelID + "\n```"}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
