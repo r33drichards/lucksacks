@@ -509,6 +509,40 @@ Example:
 			}
 			return
 
+		case "/choose":
+			var vals []string;
+			if strings.Contains(s.Text, "\""){
+
+				ss := strings.Split(s.Text, "\"")
+				for _, s := range ss{
+					if s != "" && s != " " {
+						vals = append(vals, s)
+					}
+				}
+			} else {
+				vals = strings.Split(s.Text, " ")
+			}
+			rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
+			s := rand.NewSource(time.Now().Unix())
+			r := rand.New(s) // initialize local pseudorandom generator
+
+			var params *slack.Msg;
+			if len(vals) > 0 {
+				params = &slack.Msg{Text: vals[r.Intn(len(vals))]}
+			} else {
+				params = &slack.Msg{Text: "nothing to choose from"}
+			}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
+			return
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
