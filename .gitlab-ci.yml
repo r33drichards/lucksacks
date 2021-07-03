@@ -64,7 +64,7 @@ build:
 
 
 init:
-  image: registry.gitlab.com/gitlab-org/terraform-images/releases/0.14
+  image: registry.gitlab.com/gitlab-org/terraform-images/releases/1.0
   stage: prepare
   needs: []
   script:
@@ -72,7 +72,7 @@ init:
     - gitlab-terraform init
 
 validate:
-  image: registry.gitlab.com/gitlab-org/terraform-images/releases/0.14
+  image: registry.gitlab.com/gitlab-org/terraform-images/releases/1.0
   stage: validate
   needs:
     - init
@@ -81,7 +81,7 @@ validate:
     - gitlab-terraform validate
 
 plan:
-  image: registry.gitlab.com/gitlab-org/terraform-images/releases/0.14
+  image: registry.gitlab.com/gitlab-org/terraform-images/releases/1.0
   stage: plan
   needs:
     - validate
@@ -97,7 +97,7 @@ plan:
       terraform: ${TF_ROOT}/plan.json
 
 apply:
-  image: registry.gitlab.com/gitlab-org/terraform-images/releases/0.14
+  image: registry.gitlab.com/gitlab-org/terraform-images/releases/1.0
   stage: deploy
   needs:
     - plan
