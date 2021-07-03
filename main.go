@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -532,6 +534,21 @@ Example:
 			} else {
 				params = &slack.Msg{Text: "nothing to choose from"}
 			}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
+			return
+		case "/sha256":
+			h := sha256.New()
+			h.Write([]byte(s.Text))
+			params := &slack.Msg{Text: hex.EncodeToString(h.Sum(nil))}
 			b, err := json.Marshal(params)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
