@@ -11,6 +11,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/comprehend"
 	u "github.com/bcicen/go-units"
 	_ "github.com/joho/godotenv/autoload"
 
@@ -112,6 +115,11 @@ func allAnagrams(word string) Anagrams {
 
 //go:embed docs/tz.md
 var TZ_HELP string
+
+func unquoteCodePoint(s string) (string, error) {
+	r, err := strconv.ParseInt(strings.TrimPrefix(s, "\\U"), 16, 32)
+	return string(r), err
+}
 
 func main() {
 
@@ -497,7 +505,7 @@ Example:
 				return
 			}
 			rand.Seed(time.Now().UnixNano())
-			randInt := rand.Intn(i) +1
+			randInt := rand.Intn(i) + 1
 			params := &slack.Msg{Text: strconv.Itoa(randInt)}
 			b, err := json.Marshal(params)
 			if err != nil {
@@ -512,11 +520,11 @@ Example:
 			return
 
 		case "/choose":
-			var vals []string;
-			if strings.Contains(s.Text, "\""){
+			var vals []string
+			if strings.Contains(s.Text, "\"") {
 
 				ss := strings.Split(s.Text, "\"")
-				for _, s := range ss{
+				for _, s := range ss {
 					if s != "" && s != " " {
 						vals = append(vals, s)
 					}
@@ -528,7 +536,7 @@ Example:
 			s := rand.NewSource(time.Now().Unix())
 			r := rand.New(s) // initialize local pseudorandom generator
 
-			var params *slack.Msg;
+			var params *slack.Msg
 			if len(vals) > 0 {
 				params = &slack.Msg{Text: vals[r.Intn(len(vals))]}
 			} else {
@@ -550,6 +558,50 @@ Example:
 			h.Write([]byte(s.Text))
 			params := &slack.Msg{Text: hex.EncodeToString(h.Sum(nil))}
 			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
+			return
+		case "/sentiment":
+			// s.Text
+			sess := session.Must(session.NewSession(&aws.Config{
+				Region: aws.String("us-east-2"),
+			}))
+
+			// Create a Comprehend client from just a session.
+			client := comprehend.New(sess)
+
+			params := comprehend.DetectSentimentInput{}
+			params.SetLanguageCode("en")
+			params.SetText(s.Text)
+
+			req, resp := client.DetectSentimentRequest(&params)
+
+			err = req.Send()
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+
+			// https://stackoverflow.com/questions/55700149/print-emoji-from-unicode-literal-loaded-from-file
+			sentEmoji := make(map[string]string)
+			frown, _ := unquoteCodePoint("\\U00002639")
+			sentEmoji["NEGATIVE"] = frown
+			grin, _:= unquoteCodePoint("\\U0001f600")
+			sentEmoji["POSITIVE"] = grin
+			upsideDownFace, _:= unquoteCodePoint("\\U0001f643")
+			sentEmoji["MIXED"] = upsideDownFace
+			expressionless, _ := unquoteCodePoint("\\U0001f611")
+			sentEmoji["NEUTRAL"] = expressionless
+
+			slackParams := &slack.Msg{Text: sentEmoji[*resp.Sentiment] + " " + *resp.Sentiment}
+			b, err := json.Marshal(slackParams)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
