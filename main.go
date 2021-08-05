@@ -121,6 +121,67 @@ func unquoteCodePoint(s string) (string, error) {
 	return string(r), err
 }
 
+func msgSlack(msg string, w http.ResponseWriter) error {
+	params := &slack.Msg{Text: msg}
+	b, err := json.Marshal(params)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, err = w.Write(b)
+	return err
+
+}
+
+func logErrMsgSlack(w http.ResponseWriter, msg string) {
+	err := msgSlack(msg, w)
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func qrngSlackCommand(w http.ResponseWriter, s slack.SlashCommand, url string) {
+	// fetch random 2 digit hex from https://qrng.anu.edu.au/
+	var randNumSourceUrl = url
+	var numRequests int
+	var err error
+
+	if s.Text == "" {
+		numRequests = 1
+	} else {
+		numRequests, err = strconv.Atoi(s.Text)
+		if err != nil {
+			msg := "invalid input: " + s.Text
+			logErrMsgSlack(w, msg)
+		}
+
+	}
+
+	i := 0
+	msg := ""
+	for i < numRequests {
+		resp, err := http.Get(randNumSourceUrl)
+		if err != nil {
+			msg := "error fetching " + randNumSourceUrl
+			logErrMsgSlack(w, msg)
+			return
+		} else {
+			defer resp.Body.Close()
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				logErrMsgSlack(w, "error reading body from "+randNumSourceUrl)
+				return
+			} else {
+				msg = msg + string(body)
+			}
+		}
+		i = i + 1
+	}
+	logErrMsgSlack(w, msg)
+
+}
+
 func main() {
 
 	api := slack.New(os.Getenv("SLACK_BOT_TOKEN"))
@@ -148,46 +209,17 @@ func main() {
 
 		switch s.Command {
 		case "/echo":
-			params := &slack.Msg{Text: s.Text}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, s.Text)
+			return
 		case "/anagram":
 			if len(s.Text) > 8 {
-				params := &slack.Msg{Text: "too long, max 8 letters"}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, "message too long, max 8 chars")
 				return
 			}
 
 			// slack wants a fast response, anagrams can take a while to find,
 			// dm user anagrams after found and respond right away
-			params := &slack.Msg{Text: "searching...\nwill dm when finished"}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, "searching...\nwill dm when finished")
 
 			go func() {
 				anagrams := allAnagrams(s.Text)
@@ -204,85 +236,37 @@ func main() {
 					log.Println(err)
 				}
 			}()
+			return
 
 		case "/convert":
 			vals := strings.Split(s.Text, " ")
 			from, err := u.Find(vals[1])
 			if err != nil {
-				params := &slack.Msg{Text: vals[1] + " not valid unit"}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, vals[1]+" not valid unit")
 				return
 			}
 			to, err := u.Find(vals[2])
 			if err != nil {
-				params := &slack.Msg{Text: vals[2] + " not valid unit"}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, vals[2]+" not valid unit")
 				return
 			}
 
 			val, err := strconv.ParseFloat(vals[0], 64)
 			if err != nil {
-				params := &slack.Msg{Text: vals[0] + " failed to parse"}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, vals[0]+" failed to parse")
 				return
 			}
 
 			message, err := u.ConvertFloat(val, from, to)
 
 			if err != nil {
-				params := &slack.Msg{Text: "failed to preform conversion for: " + vals[0] + " " + vals[1] + " " + " " + vals[2]}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, "failed to preform conversion for: "+vals[0]+" "+vals[1]+" "+" "+vals[2])
 				return
 
 			}
+			logErrMsgSlack(w, fmt.Sprintf("%s %ss is %s", vals[0], from.Name, message.String()))
+			return
 
-			params := &slack.Msg{Text: fmt.Sprintf("%s %ss is %s", vals[0], from.Name, message.String())}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
 		case "/tz":
 			// TODO: set default timezone
 			// TODO: set default conversion
@@ -291,18 +275,7 @@ func main() {
 			vals := strings.Split(s.Text, " ")
 
 			if vals[0] == "help" {
-
-				params := &slack.Msg{Text: TZ_HELP}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, TZ_HELP)
 				return
 			} else if vals[0] == "now" {
 
@@ -336,17 +309,7 @@ func main() {
 
 				}
 				message = message + "```"
-				params := &slack.Msg{Text: message}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, message)
 				return
 
 			}
@@ -425,17 +388,8 @@ func main() {
 			}
 
 			message = message + "```"
-			params := &slack.Msg{Text: message}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, message)
+			return
 		case "/yt":
 			// TODO: would be nice to handle https://www.youtube.com/c/STLChessClub/videos
 			// style links too
@@ -457,97 +411,41 @@ func main() {
 			} else {
 				msg = fmt.Sprintf("url format not recognised for %s", s.Text)
 			}
-			params := &slack.Msg{Text: msg}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, msg)
+			return
 
 		case "/ttv":
 			splitText := strings.Split(s.Text, "/")
 			twitchChannelID := splitText[len(splitText)-1]
 			msg := fmt.Sprintf("/feed add https://twitchrss.appspot.com/vod/%s", twitchChannelID)
-
-			params := &slack.Msg{Text: msg}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, msg)
+			return
 
 		case "/roll":
 			if s.Text == "" || s.Text == "help" {
-				params := &slack.Msg{Text: `returns a random number between 1 and N
+				msg := `returns a random number between 1 and N
 
 Example:
 
 /roll 6
 
 -> 1
-`,
-				}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+`
+				logErrMsgSlack(w, msg)
 				return
 			}
 			i, err := strconv.Atoi(s.Text)
 			if err != nil {
-				params := &slack.Msg{Text: "Invalid input: " + s.Text}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, "Invalid input: "+s.Text)
 				return
 			}
 			if i <= 0 {
-				params := &slack.Msg{Text: "provide integer greater than 0"}
-				b, err := json.Marshal(params)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
+				logErrMsgSlack(w, "provide integer greater than 0")
 				return
 			}
 			rand.Seed(time.Now().UnixNano())
 			randInt := rand.Intn(i) + 1
-			params := &slack.Msg{Text: strconv.Itoa(randInt)}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
+			err = msgSlack(strconv.Itoa(randInt), w)
 			if err != nil {
 				log.Println(err)
 			}
@@ -570,37 +468,19 @@ Example:
 			s := rand.NewSource(time.Now().Unix())
 			r := rand.New(s) // initialize local pseudorandom generator
 
-			var params *slack.Msg
+			var msg string
 			if len(vals) > 0 {
-				params = &slack.Msg{Text: vals[r.Intn(len(vals))]}
+				msg = vals[r.Intn(len(vals))]
 			} else {
-				params = &slack.Msg{Text: "nothing to choose from"}
+				msg = "nothing to choose from"
 			}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			logErrMsgSlack(w, msg)
 			return
 		case "/sha256":
 			h := sha256.New()
 			h.Write([]byte(s.Text))
-			params := &slack.Msg{Text: hex.EncodeToString(h.Sum(nil))}
-			b, err := json.Marshal(params)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			msg := hex.EncodeToString(h.Sum(nil))
+			logErrMsgSlack(w, msg)
 			return
 		case "/sentiment":
 			// s.Text
@@ -634,177 +514,16 @@ Example:
 			expressionless, _ := unquoteCodePoint("\\U0001f611")
 			sentEmoji["NEUTRAL"] = expressionless
 
-			slackParams := &slack.Msg{Text: sentEmoji[*resp.Sentiment] + " " + *resp.Sentiment}
-			b, err := json.Marshal(slackParams)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			msg := sentEmoji[*resp.Sentiment] + " " + *resp.Sentiment
+			logErrMsgSlack(w, msg)
 			return
 		case "/hex":
-			// fetch random 2 digit hex from https://qrng.anu.edu.au/
-			var randNumSourceUrl = "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_hex.php"
-			var slackParams *slack.Msg
-			var numRequests int
-
-			if s.Text == "" {
-				numRequests = 1
-			} else {
-
-				numRequests, err = strconv.Atoi(s.Text)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "invalid input: " + s.Text}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				}
-
-			}
-
-			i := 0
-			msg := ""
-			for i < numRequests {
-				resp, err := http.Get(randNumSourceUrl)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "error fetching " + randNumSourceUrl}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				} else {
-					defer resp.Body.Close()
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						slackParams = &slack.Msg{Text: "error reading body from " + randNumSourceUrl}
-						b, err := json.Marshal(slackParams)
-						if err != nil {
-							w.WriteHeader(http.StatusInternalServerError)
-							return
-						}
-						w.Header().Set("Content-Type", "application/json")
-						_, err = w.Write(b)
-						if err != nil {
-							log.Println(err)
-						}
-						return
-					} else {
-						msg = msg + string(body)
-					}
-				}
-				i = i + 1
-			}
-			slackParams = &slack.Msg{Text: msg}
-
-			b, err := json.Marshal(slackParams)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			// fetch random 2 digit hex
+			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_hex.php")
 			return
 		case "/binary":
-			// fetch random 8 bit binary number from https://qrng.anu.edu.au/
-			var randNumSourceUrl = "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_binary.php"
-			var slackParams *slack.Msg
-			var numRequests int
-
-			if s.Text == "" {
-				numRequests = 1
-			} else {
-
-				numRequests, err = strconv.Atoi(s.Text)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "invalid input: " + s.Text}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				}
-
-			}
-
-			i := 0
-			msg := ""
-			for i < numRequests {
-				resp, err := http.Get(randNumSourceUrl)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "error fetching " + randNumSourceUrl}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				} else {
-					defer resp.Body.Close()
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						slackParams = &slack.Msg{Text: "error reading body from " + randNumSourceUrl}
-						b, err := json.Marshal(slackParams)
-						if err != nil {
-							w.WriteHeader(http.StatusInternalServerError)
-							return
-						}
-						w.Header().Set("Content-Type", "application/json")
-						_, err = w.Write(b)
-						if err != nil {
-							log.Println(err)
-						}
-						return
-					} else {
-						msg = msg + string(body)
-					}
-				}
-				i = i + 1
-			}
-			slackParams = &slack.Msg{Text: msg}
-
-			b, err := json.Marshal(slackParams)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			// fetch random 8 bit binary number
+			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_binary.php")
 			return
 		case "/rcolor":
 			// fetch random color from https://qrng.anu.edu.au/
@@ -861,84 +580,8 @@ Example:
 			return
 		case "/ralpha":
 			// fetch 1024 random char block from https://qrng.anu.edu.au/
-			var randNumSourceUrl = "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_alpha.php"
-			var slackParams *slack.Msg
-			var numRequests int
-
-			if s.Text == "" {
-				numRequests = 1
-			} else {
-
-				numRequests, err = strconv.Atoi(s.Text)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "invalid input: " + s.Text}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				}
-
-			}
-
-			i := 0
-			msg := ""
-			for i < numRequests {
-				resp, err := http.Get(randNumSourceUrl)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "error fetching " + randNumSourceUrl}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				} else {
-					defer resp.Body.Close()
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						slackParams = &slack.Msg{Text: "error reading body from " + randNumSourceUrl}
-						b, err := json.Marshal(slackParams)
-						if err != nil {
-							w.WriteHeader(http.StatusInternalServerError)
-							return
-						}
-						w.Header().Set("Content-Type", "application/json")
-						_, err = w.Write(b)
-						if err != nil {
-							log.Println(err)
-						}
-						return
-					} else {
-						msg = msg + string(body)
-					}
-				}
-				i = i + 1
-			}
-
-			slackParams = &slack.Msg{Text: msg}
-
-			b, err := json.Marshal(slackParams)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			_, err = w.Write(b)
-			if err != nil {
-				log.Println(err)
-			}
+			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_alpha.php")
+			return
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			return
