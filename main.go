@@ -610,9 +610,9 @@ Example:
 			sentEmoji := make(map[string]string)
 			frown, _ := unquoteCodePoint("\\U00002639")
 			sentEmoji["NEGATIVE"] = frown
-			grin, _:= unquoteCodePoint("\\U0001f600")
+			grin, _ := unquoteCodePoint("\\U0001f600")
 			sentEmoji["POSITIVE"] = grin
-			upsideDownFace, _:= unquoteCodePoint("\\U0001f643")
+			upsideDownFace, _ := unquoteCodePoint("\\U0001f643")
 			sentEmoji["MIXED"] = upsideDownFace
 			expressionless, _ := unquoteCodePoint("\\U0001f611")
 			sentEmoji["NEUTRAL"] = expressionless
