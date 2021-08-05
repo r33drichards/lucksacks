@@ -469,6 +469,23 @@ func main() {
 				log.Println(err)
 			}
 
+		case "/ttv":
+			splitText := strings.Split(s.Text, "/")
+			twitchChannelID := splitText[len(splitText)-1]
+			msg := fmt.Sprintf("/feed add https://twitchrss.appspot.com/vod/%s", twitchChannelID)
+
+			params := &slack.Msg{Text: msg}
+			b, err := json.Marshal(params)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, err = w.Write(b)
+			if err != nil {
+				log.Println(err)
+			}
+
 		case "/roll":
 			if s.Text == "" || s.Text == "help" {
 				params := &slack.Msg{Text: `returns a random number between 1 and N
