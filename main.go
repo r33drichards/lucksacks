@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/comprehend"
 	u "github.com/bcicen/go-units"
+	"github.com/golang-jwt/jwt"
 	_ "github.com/joho/godotenv/autoload"
 
 	"io"
@@ -182,6 +183,22 @@ func qrngSlackCommand(w http.ResponseWriter, s slack.SlashCommand, url string) {
 
 }
 
+// https://stackoverflow.com/questions/45405626/decoding-jwt-token-in-golang
+func jwtdecode(tokenString string) (string, error) {
+	msg := ""
+	claims := jwt.MapClaims{}
+	_, err := jwt.ParseWithClaims(tokenString, claims, nil)
+	// ... error handling
+	if err != nil {
+		return "", err
+	}
+
+	// do something with decoded claims
+	for key, val := range claims {
+		msg = msg + fmt.Sprintf("Key: %v, value: %v\n", key, val)
+	}
+	return msg, nil
+}
 func main() {
 
 	api := slack.New(os.Getenv("SLACK_BOT_TOKEN"))
@@ -581,6 +598,13 @@ Example:
 		case "/ralpha":
 			// fetch 1024 random char block from https://qrng.anu.edu.au/
 			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_alpha.php")
+			return
+		case "/jwtdecode":
+			msg, err := jwtdecode(s.Text)
+			if err != nil {
+				logErrMsgSlack(w, err.Error())
+			}
+			msgSlack(msg, w)
 			return
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
