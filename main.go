@@ -606,6 +606,13 @@ Example:
 			}
 			msgSlack(msg, w)
 			return
+		case "/gpt3":
+			msg, err := gpt3(s.Text)
+			if err != nil {
+				logErrMsgSlack(w, err.Error())
+			}
+			msgSlack(msg, w)
+
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
 			return
