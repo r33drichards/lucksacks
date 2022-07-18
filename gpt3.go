@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"os"
 )
+
+var OpenAPISecretKey = os.Getenv("OPENAPI_SECRET_KEY")
 
 type choice struct {
 	Text string `json:"text"`
