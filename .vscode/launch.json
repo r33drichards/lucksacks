@@ -5,13 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "server",
+            "name": "Launch file",
             "type": "go",
             "request": "launch",
-            "mode": "debug",
-            "program": "${workspaceFolder}/main.go",
-            //   "envFile": "${workspaceFolder}/prod_lite.env",
+            "mode": "exec",
+            "program": "${workspaceFolder}/lucksacks",
             "envFile": "${workspaceFolder}/.env",
-          },
+        },
     ]
 }
