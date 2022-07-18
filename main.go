@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
@@ -36,6 +37,8 @@ type Dictionary map[string]bool
 // file is ~200 kb, binary is ~7.5mb
 //go:embed popular.txt
 var content embed.FS
+
+var OpenAPISecretKey = os.Getenv("OPENAPI_SECRET_KEY")
 
 // We assume they are unique
 func permutations(word string) []string {
@@ -607,6 +610,7 @@ Example:
 			msgSlack(msg, w)
 			return
 		case "/gpt3":
+			fmt.Println(s.Text)
 			msg, err := gpt3(s.Text)
 			if err != nil {
 				logErrMsgSlack(w, err.Error())
@@ -627,4 +631,99 @@ Example:
 	log.Println("server listening")
 	// TODO: port should be env var
 	http.ListenAndServe(":3000", nil)
+}
+
+type choice struct {
+	Text string `json:"text"`
+}
+
+type gpt3Response struct {
+	Choices []choice `json:"choices"`
+}
+
+type gpt3Request struct {
+	Prompt string `json:"prompt"`
+	Model string `json:"model"`
+	MaxTokens int `json:"max_tokens"`
+}
+
+func newGpt3Request(prompt string) *gpt3Request {
+	return &gpt3Request{
+		Prompt: prompt,
+		Model: "text-davinci-002",
+		MaxTokens: 2048,
+	}
+}
+
+func gpt3(input string) (string, error) {
+	url := "https://api.openai.com/v1/completions"
+	headers := map[string]string{
+		"Content-Type":  "application/json",
+		"Authorization": "Bearer " + OpenAPISecretKey,
+	}
+	request := newGpt3Request(input)
+	b, err := json.Marshal(request)
+	if err != nil {
+		return "", err
+	}
+	resp, err := postRequest(url, headers, b)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var gpt3Response gpt3Response
+	err = json.NewDecoder(resp.Body).Decode(&gpt3Response)
+	if err != nil {
+		return "", err
+	}
+	fullresponse := ""
+	for _, choice := range gpt3Response.Choices {
+		fullresponse += choice.Text
+	}
+	return fullresponse, nil
+
+}
+
+// https://beta.openai.com/docs/api-reference/completions/create
+// curl https://api.openai.com/v1/completions \
+//   -H 'Content-Type: application/json' \
+//   -H 'Authorization: Bearer YOUR_API_KEY' \
+//   -d '{
+//   "model": "text-davinci-002",
+//   "prompt": "Say this is a test",
+//   "max_tokens": 6,
+//   "temperature": 0
+// }'
+// Response
+//{
+// 	"id": "cmpl-uqkvlQyYK7bGYrRHQ0eXlWi7",
+// 	"object": "text_completion",
+// 	"created": 1589478378,
+// 	"model": "text-davinci-002",
+// 	"choices": [
+// 	  {
+// 		"text": "\n\nThis is a test",
+// 		"index": 0,
+// 		"logprobs": null,
+// 		"finish_reason": "length"
+// 	  }
+// 	],
+// 	"usage": {
+// 	  "prompt_tokens": 5,
+// 	  "completion_tokens": 6,
+// 	  "total_tokens": 11
+// 	}
+//   }
+
+// post request to openai api with headers
+func postRequest(url string, headers map[string]string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	client := &http.Client{}
+	return client.Do(req)
 }
