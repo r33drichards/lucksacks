@@ -2,12 +2,23 @@ package main
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/comprehend"
 	"github.com/slack-go/slack"
 )
+
+func unquoteCodePoint(s string) (string, error) {
+	n, err := strconv.ParseInt(s, 16, 32)
+	if err != nil {
+		return "", err
+	}
+	r := rune(n)
+	return string(r), nil
+
+}
 
 func sentiment(s slack.SlashCommand, w http.ResponseWriter) {
 	// s.Text

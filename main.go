@@ -3,7 +3,6 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
-	"strconv"
 
 	_ "github.com/joho/godotenv/autoload"
 
@@ -12,18 +11,12 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	"github.com/slack-go/slack"
 )
 
 //go:embed docs/tz.md
 var TZ_HELP string
-
-func unquoteCodePoint(s string) (string, error) {
-	r, err := strconv.ParseInt(strings.TrimPrefix(s, "\\U"), 16, 32)
-	return string(r), err
-}
 
 func msgSlack(msg string, w http.ResponseWriter) error {
 	params := &slack.Msg{Text: msg}
