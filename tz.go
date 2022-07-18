@@ -25,7 +25,7 @@ func tz(s slack.SlashCommand, w http.ResponseWriter) {
 		location := vals[1]
 
 		locationOlsenTime := map[string][]string{
-			"usa": []string{
+			"usa": {
 				"America/New_York",
 				"America/Chicago",
 				"America/Denver",
@@ -132,6 +132,5 @@ func tz(s slack.SlashCommand, w http.ResponseWriter) {
 
 	message = message + "```"
 	logErrMsgSlack(w, message)
-	return
 
 }

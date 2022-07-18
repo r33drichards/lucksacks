@@ -30,5 +30,4 @@ func yt(s slack.SlashCommand, w http.ResponseWriter) {
 		msg = fmt.Sprintf("url format not recognised for %s", s.Text)
 	}
 	logErrMsgSlack(w, msg)
-	return
 }

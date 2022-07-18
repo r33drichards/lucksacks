@@ -13,5 +13,4 @@ func ttv(s slack.SlashCommand, w http.ResponseWriter) {
 	twitchChannelID := splitText[len(splitText)-1]
 	msg := fmt.Sprintf("/feed add https://twitchrss.appspot.com/vod/%s", twitchChannelID)
 	logErrMsgSlack(w, msg)
-	return
 }
