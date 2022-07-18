@@ -1,18 +1,10 @@
 package main
 
 import (
-	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"math/rand"
 	"strconv"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/comprehend"
 	_ "github.com/joho/godotenv/autoload"
 
 	"io"
@@ -97,102 +89,17 @@ func main() {
 		case "/ttv":
 			ttv(s, w)
 			return
-
 		case "/roll":
-			if s.Text == "" || s.Text == "help" {
-				msg := `returns a random number between 1 and N
-
-Example:
-
-/roll 6
-
--> 1
-`
-				logErrMsgSlack(w, msg)
-				return
-			}
-			i, err := strconv.Atoi(s.Text)
-			if err != nil {
-				logErrMsgSlack(w, "Invalid input: "+s.Text)
-				return
-			}
-			if i <= 0 {
-				logErrMsgSlack(w, "provide integer greater than 0")
-				return
-			}
-			rand.Seed(time.Now().UnixNano())
-			randInt := rand.Intn(i) + 1
-			err = msgSlack(strconv.Itoa(randInt), w)
-			if err != nil {
-				log.Println(err)
-			}
+			roll(s, w)
 			return
-
 		case "/choose":
-			var vals []string
-			if strings.Contains(s.Text, "\"") {
-
-				ss := strings.Split(s.Text, "\"")
-				for _, s := range ss {
-					if s != "" && s != " " {
-						vals = append(vals, s)
-					}
-				}
-			} else {
-				vals = strings.Split(s.Text, " ")
-			}
-			rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
-			s := rand.NewSource(time.Now().Unix())
-			r := rand.New(s) // initialize local pseudorandom generator
-
-			var msg string
-			if len(vals) > 0 {
-				msg = vals[r.Intn(len(vals))]
-			} else {
-				msg = "nothing to choose from"
-			}
-			logErrMsgSlack(w, msg)
+			choose(s, w)
 			return
 		case "/sha256":
-			h := sha256.New()
-			h.Write([]byte(s.Text))
-			msg := hex.EncodeToString(h.Sum(nil))
-			logErrMsgSlack(w, msg)
+			mysha256(s, w)
 			return
 		case "/sentiment":
-			// s.Text
-			sess := session.Must(session.NewSession(&aws.Config{
-				Region: aws.String("us-east-2"),
-			}))
-
-			// Create a Comprehend client from just a session.
-			client := comprehend.New(sess)
-
-			params := comprehend.DetectSentimentInput{}
-			params.SetLanguageCode("en")
-			params.SetText(s.Text)
-
-			req, resp := client.DetectSentimentRequest(&params)
-
-			err = req.Send()
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-
-			// https://stackoverflow.com/questions/55700149/print-emoji-from-unicode-literal-loaded-from-file
-			sentEmoji := make(map[string]string)
-			frown, _ := unquoteCodePoint("\\U00002639")
-			sentEmoji["NEGATIVE"] = frown
-			grin, _ := unquoteCodePoint("\\U0001f600")
-			sentEmoji["POSITIVE"] = grin
-			upsideDownFace, _ := unquoteCodePoint("\\U0001f643")
-			sentEmoji["MIXED"] = upsideDownFace
-			expressionless, _ := unquoteCodePoint("\\U0001f611")
-			sentEmoji["NEUTRAL"] = expressionless
-
-			msg := sentEmoji[*resp.Sentiment] + " " + *resp.Sentiment
-			logErrMsgSlack(w, msg)
+			sentiment(s, w)
 			return
 		case "/hex":
 			// fetch random 2 digit hex
@@ -203,58 +110,7 @@ Example:
 			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_binary.php")
 			return
 		case "/rcolor":
-			// fetch random color from https://qrng.anu.edu.au/
-			var randNumSourceUrl = "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_one_colour.php"
-			var slackParams *slack.Msg
-
-			resp, err := http.Get(randNumSourceUrl)
-			if err != nil {
-				slackParams = &slack.Msg{Text: "error fetching " + randNumSourceUrl}
-				b, err := json.Marshal(slackParams)
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					return
-				}
-				w.Header().Set("Content-Type", "application/json")
-				_, err = w.Write(b)
-				if err != nil {
-					log.Println(err)
-				}
-				return
-			} else {
-				defer resp.Body.Close()
-				body, err := io.ReadAll(resp.Body)
-				if err != nil {
-					slackParams = &slack.Msg{Text: "error reading body from " + randNumSourceUrl}
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-					return
-				} else {
-					colorString := string(body)
-					msg := fmt.Sprintf("%s\nhttps://coolors.co/%s", colorString, colorString)
-					slackParams = &slack.Msg{Text: msg}
-
-					b, err := json.Marshal(slackParams)
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						return
-					}
-					w.Header().Set("Content-Type", "application/json")
-					_, err = w.Write(b)
-					if err != nil {
-						log.Println(err)
-					}
-				}
-			}
-			return
+			rcolor(s, w)
 		case "/ralpha":
 			// fetch 1024 random char block from https://qrng.anu.edu.au/
 			qrngSlackCommand(w, s, "https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_alpha.php")
@@ -272,6 +128,7 @@ Example:
 				logErrMsgSlack(w, err.Error())
 			}
 			msgSlack(msg, w)
+			return
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
