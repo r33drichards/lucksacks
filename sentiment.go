@@ -43,13 +43,13 @@ func sentiment(s slack.SlashCommand, w http.ResponseWriter) {
 
 	// https://stackoverflow.com/questions/55700149/print-emoji-from-unicode-literal-loaded-from-file
 	sentEmoji := make(map[string]string)
-	frown, _ := unquoteCodePoint("\\U00002639")
+	frown, _ := unquoteCodePoint("00002639")
 	sentEmoji["NEGATIVE"] = frown
-	grin, _ := unquoteCodePoint("\\U0001f600")
+	grin, _ := unquoteCodePoint("0001f600")
 	sentEmoji["POSITIVE"] = grin
-	upsideDownFace, _ := unquoteCodePoint("\\U0001f643")
+	upsideDownFace, _ := unquoteCodePoint("0001f643")
 	sentEmoji["MIXED"] = upsideDownFace
-	expressionless, _ := unquoteCodePoint("\\U0001f611")
+	expressionless, _ := unquoteCodePoint("0001f611")
 	sentEmoji["NEUTRAL"] = expressionless
 
 	msg := sentEmoji[*resp.Sentiment] + " " + *resp.Sentiment
