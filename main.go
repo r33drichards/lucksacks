@@ -122,6 +122,8 @@ func main() {
 			}
 			msgSlack(msg, w)
 			return
+		case "/b64":
+			msgSlack(b64(s), w)
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)
