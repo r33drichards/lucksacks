@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+
 	"github.com/getsentry/sentry-go"
 
 	log "github.com/sirupsen/logrus"
@@ -140,8 +141,18 @@ func main() {
 			return
 		case "/b64":
 			msgSlack(b64(s), w)
-		case "date":
+			return
+		case "/date":
 			msgSlack(date(), w)
+			return
+		case "/streak":
+			msg, err := streak(s)
+			if err != nil {
+				sentry.CaptureException(err)
+				logErrMsgSlack(w, err.Error())
+			}
+			msgSlack(msg, w)
+			return
 
 		default:
 			w.WriteHeader(http.StatusInternalServerError)

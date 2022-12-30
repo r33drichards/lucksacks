@@ -22,3 +22,7 @@ apply-ecr:
 
 delete-gitlab-state:
 	curl -I --header "Private-Token: ${TOKEN}" --request DELETE "https://gitlab.com/api/v4/projects/${PROJECT_ID}/terraform/state/${PROJECT_NAME}"
+
+restart-app:
+	# restart docekr compose app
+	docker-compose restart app
