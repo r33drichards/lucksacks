@@ -8,9 +8,10 @@ import (
 
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/slack-go/slack"
 )
@@ -39,6 +40,9 @@ func logErrMsgSlack(w http.ResponseWriter, msg string) {
 }
 
 func main() {
+	log.SetFormatter(&log.JSONFormatter{})
+
+	log.WithFields(log.Fields{"string": "foo", "int": 1, "float": 1.1}).Info("My first event from golang to stdout")
 
 	api := slack.New(os.Getenv("SLACK_BOT_TOKEN"))
 	signingSecret := os.Getenv("SLACK_SIGNING_SECRET")
