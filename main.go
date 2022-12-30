@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"github.com/getsentry/sentry-go"
 
 	log "github.com/sirupsen/logrus"
 
@@ -34,12 +35,23 @@ func msgSlack(msg string, w http.ResponseWriter) error {
 
 func logErrMsgSlack(w http.ResponseWriter, msg string) {
 	err := msgSlack(msg, w)
+	sentry.CaptureException(err)
 	if err != nil {
 		log.Println(err)
 	}
 }
 
 func main() {
+	err := sentry.Init(sentry.ClientOptions{
+		Dsn: "https://4ee2152b98494a29a5fff791a31cf9db@o514182.ingest.sentry.io/4504227079651328",
+		// Set TracesSampleRate to 1.0 to capture 100%
+		// of transactions for performance monitoring.
+		// We recommend adjusting this value in production,
+		TracesSampleRate: 1.0,
+	})
+	if err != nil {
+		log.Fatalf("sentry.Init: %s", err)
+	}
 	log.SetFormatter(&log.JSONFormatter{})
 
 	log.WithFields(log.Fields{"string": "foo", "int": 1, "float": 1.1}).Info("My first event from golang to stdout")
