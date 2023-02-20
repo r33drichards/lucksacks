@@ -103,6 +103,9 @@ func main() {
 		case "/roll":
 			roll(s, w)
 			return
+		case "/wchoose":
+			wchoose(s, w)
+			return
 		case "/choose":
 			choose(s, w)
 			return
