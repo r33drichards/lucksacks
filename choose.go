@@ -3,6 +3,7 @@ package main
 import (
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,9 +37,17 @@ func choose(s slack.SlashCommand, w http.ResponseWriter) {
 
 }
 
-type choice struct {
+type weightedChoice struct {
 	choice string
 	weight int
+}
+
+func atoi(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 1
+	}
+	return i
 }
 
 func wchoose(s slack.SlashCommand, w http.ResponseWriter) {
@@ -55,13 +64,13 @@ func wchoose(s slack.SlashCommand, w http.ResponseWriter) {
 		vals = strings.Split(s.Text, " ")
 	}
 
-	var choices []choice
+	var choices []weightedChoice
 	for _, v := range vals {
 		if strings.Contains(v, ":") {
 			ss := strings.Split(v, ":")
-			choices = append(choices, choice{choice: ss[0], weight: atoi(ss[1])})
+			choices = append(choices, weightedChoice{choice: ss[0], weight: atoi(ss[1])})
 		} else {
-			choices = append(choices, choice{choice: v, weight: 1})
+			choices = append(choices, weightedChoice{choice: v, weight: 1})
 		}
 	}
 
@@ -72,7 +81,7 @@ func wchoose(s slack.SlashCommand, w http.ResponseWriter) {
 			choicesStr = append(choicesStr, c.choice)
 		}
 	}
-	
+
 	rand.Seed(time.Now().Unix()) // initialize global pseudo random generator
 	source := rand.NewSource(time.Now().Unix())
 	r := rand.New(source) // initialize local pseudorandom generator
