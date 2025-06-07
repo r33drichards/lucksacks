@@ -8,12 +8,3 @@ services:
 #      - ./popular.txt:/popular.txt
     ports:
       - 3000:3000
-  ngrok:
-    image: shkoliar/ngrok:latest
-    ports:
-      - 4551:4551
-    links:
-      - app
-    environment:
-      - DOMAIN=app
-      - PORT=3000

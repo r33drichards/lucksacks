@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 
+	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 
 	"io"
@@ -170,6 +171,8 @@ func main() {
 		}
 	})
 	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		reqID := uuid.New().String()
+		log.WithFields(log.Fields{"reqID": reqID}).Info("events")
 		// handle slack events and verify ownership
 		// https://api.slack.com/events/url_verification
 		// https://api.slack.com/events
@@ -180,6 +183,7 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
+		log.WithFields(log.Fields{"reqID": reqID, "body": string(body)}).Info("body")
 		sv, err := slack.NewSecretsVerifier(r.Header, signingSecret)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -213,13 +217,42 @@ func main() {
 			innerEvent := eventsAPIEvent.InnerEvent
 			switch ev := innerEvent.Data.(type) {
 			case *slackevents.AppMentionEvent:
-				api.PostMessage(ev.Channel, slack.MsgOptionText("Yes, hello.", false))
+				// Reply in thread if possible
+				threadTS := ev.ThreadTimeStamp
+				if threadTS == "" {
+					threadTS = ev.TimeStamp
+				}
+				_, _, err := api.PostMessage(
+					ev.Channel,
+					slack.MsgOptionText("Hello from thread!", false),
+					slack.MsgOptionTS(threadTS),
+				)
+				if err != nil {
+					log.Println("Failed to reply in thread:", err)
+				}
 			case *slackevents.MessageEvent:
 				log.Println(ev.Channel, ev.Text)
+				if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
+					_, _, err := api.PostMessage(
+						ev.Channel,
+						slack.MsgOptionText("Replying in thread!", false),
+						slack.MsgOptionTS(ev.ThreadTimeStamp),
+					)
+					if err != nil {
+						log.Println("Failed to reply in thread (message event):", err)
+					}
+				}
 			}
-			//
 		}
-
+	})
+	// server hello world on /
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		reqID := uuid.New().String()
+		log.WithFields(log.Fields{"reqID": reqID}).Info("hello world")
+		_, err := w.Write([]byte("Hello, World!"))
+		if err != nil {
+			log.Println(err)
+		}
 	})
 	log.Println("server listening")
 	// TODO: port should be env var

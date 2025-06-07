@@ -8,13 +8,16 @@ launch development server with:
 docker-compose up -d
 ```
 
-navigate to [localhost:4551](http://localhost:4551/) to view the
-domain created by [ngrok](https://ngrok.com/).
 
-your page should look something like:
+## create tunnel for slack
 
 
-![ngrok main dashboard](./assets/ngrok.png)
+```
+ nix shell nixpkgs#cloudflared -c cloudflared tunnel --url http://localhost:3000  
+```
+
+
+
 
 
 navigate to your [app management
