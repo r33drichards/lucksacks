@@ -78,6 +78,9 @@ func NewLLM(
 			{
 				Name:        "uuid",
 				Description: anthropic.String("Generate a UUID"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]interface{}{},
+				},
 			},
 		}
 
