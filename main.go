@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 
+	"github.com/anthropics/anthropic-sdk-go"
+
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
 
@@ -45,6 +47,10 @@ func logErrMsgSlack(w http.ResponseWriter, msg string) {
 }
 
 func main() {
+	anthropicClient := anthropic.NewClient()
+
+	messageStore := NewSlackMessageStore(NewLLM(anthropicClient))
+
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn: "https://4ee2152b98494a29a5fff791a31cf9db@o514182.ingest.sentry.io/4504227079651328",
 		// Set TracesSampleRate to 1.0 to capture 100%
@@ -213,37 +219,59 @@ func main() {
 			w.Header().Set("Content-Type", "text")
 			w.Write([]byte(r.Challenge))
 		}
-		if eventsAPIEvent.Type == slackevents.CallbackEvent {
-			innerEvent := eventsAPIEvent.InnerEvent
-			switch ev := innerEvent.Data.(type) {
-			case *slackevents.AppMentionEvent:
-				// Reply in thread if possible
-				threadTS := ev.ThreadTimeStamp
-				if threadTS == "" {
-					threadTS = ev.TimeStamp
-				}
-				_, _, err := api.PostMessage(
-					ev.Channel,
-					slack.MsgOptionText("Hello from thread!", false),
-					slack.MsgOptionTS(threadTS),
-				)
-				if err != nil {
-					log.Println("Failed to reply in thread:", err)
-				}
-			case *slackevents.MessageEvent:
-				log.Println(ev.Channel, ev.Text)
-				if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
-					_, _, err := api.PostMessage(
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("OK"))
+		go func() {
+			if eventsAPIEvent.Type == slackevents.CallbackEvent {
+				// write 200 ok
+
+				innerEvent := eventsAPIEvent.InnerEvent
+				switch ev := innerEvent.Data.(type) {
+				case *slackevents.AppMentionEvent:
+					// Reply in thread if possible
+					threadTS := ev.ThreadTimeStamp
+					if threadTS == "" {
+						threadTS = ev.TimeStamp
+					}
+					message, err := messageStore.CallLLM(threadTS, ev.Text)
+					if err != nil {
+						log.Println("Failed to call LLM:", err)
+					}
+					_, _, err = api.PostMessage(
 						ev.Channel,
-						slack.MsgOptionText("Replying in thread!", false),
-						slack.MsgOptionTS(ev.ThreadTimeStamp),
+						slack.MsgOptionText(message, false),
+						slack.MsgOptionTS(threadTS),
 					)
 					if err != nil {
-						log.Println("Failed to reply in thread (message event):", err)
+						log.Println("Failed to reply in thread:", err)
+					}
+				case *slackevents.MessageEvent:
+					log.Println(ev.Channel, ev.Text)
+					if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
+						log.WithFields(log.Fields{
+							"reqID":   reqID,
+							"channel": ev.Channel,
+							"text":    ev.Text,
+							"thread":  ev.ThreadTimeStamp,
+							"user":    ev.User,
+						}).Info("message event")
+						message, err := messageStore.CallLLM(ev.ThreadTimeStamp, ev.Text)
+						if err != nil {
+							log.Println("Failed to call LLM:", err)
+						}
+						_, _, err = api.PostMessage(
+							ev.Channel,
+							slack.MsgOptionText(message, false),
+							slack.MsgOptionTS(ev.ThreadTimeStamp),
+						)
+						if err != nil {
+							log.Println("Failed to reply in thread (message event):", err)
+						}
 					}
 				}
 			}
-		}
+		}()
+
 	})
 	// server hello world on /
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

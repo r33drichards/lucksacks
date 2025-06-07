@@ -12,5 +12,14 @@
             "program": "${workspaceFolder}/lucksacks",
             "envFile": "${workspaceFolder}/.env",
         },
+        // go run workspaceFolder/main.go
+        {
+            "name": "Run main.go",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/main.go",
+            "envFile": "${workspaceFolder}/.env",
+        }
     ]
 }
