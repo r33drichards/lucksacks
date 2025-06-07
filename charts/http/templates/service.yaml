@@ -4,11 +4,11 @@ metadata:
   name: {{ include "http.fullname" . }}
   labels:
     {{- include "http.labels" . | nindent 4 }}
+    app: {{ .Values.appName }}
 spec:
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: 80
+      targetPort: {{ .Values.service.targetPort }}
       protocol: TCP
-      name: http
   selector:
-    {{- include "http.selectorLabels" . | nindent 4 }}
+    app: {{ .Values.appName }}
