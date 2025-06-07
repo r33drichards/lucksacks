@@ -73,7 +73,7 @@ ingress:
   tls: 
     - hosts:
         - crane.flakery.xyz
-  host: saphira.flakery.xyz
+  host: crane.flakery.xyz
 
 
 resources: {}
