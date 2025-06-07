@@ -33,3 +33,22 @@ jobs:
       - name: print image tag
         run: |
           echo "Image tag: wholelottahoopla/lucksacks:${{ github.sha }}"
+
+      - name: Update Helm values.yaml with new image tag and push
+        if: github.ref == 'refs/heads/main' && github.actor != 'github-actions[bot]'
+        run: |
+          set -e
+          # Update the image tag in values.yaml
+          sed -i.bak "s/^  tag: .*/  tag: ${{ github.sha }}/" charts/http/values.yaml
+          rm charts/http/values.yaml.bak
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Only commit if there are changes
+          if ! git diff --quiet; then
+            git add charts/http/values.yaml
+            git commit -m "chore: update Helm image tag to ${{ github.sha }}"
+            git push
+          fi
