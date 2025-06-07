@@ -4,38 +4,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+
+	"github.com/rosbit/go-quickjs"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/google/uuid"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
 )
-
-type KubernetesClient interface {
-	GetPods(namespace string) ([]corev1.Pod, error)
-	Namespaces() ([]corev1.Namespace, error)
-}
-
-type KubernetesClientImpl struct {
-	clientset *kubernetes.Clientset
-}
-
-func (c *KubernetesClientImpl) GetPods(namespace string) ([]corev1.Pod, error) {
-	pods, err := c.clientset.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return pods.Items, nil
-}
-
-func (c *KubernetesClientImpl) Namespaces() ([]corev1.Namespace, error) {
-	namespaces, err := c.clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-	return namespaces.Items, nil
-}
 
 func NewLLM(
 	client anthropic.Client,
@@ -80,6 +55,18 @@ func NewLLM(
 				Description: anthropic.String("Generate a UUID"),
 				InputSchema: anthropic.ToolInputSchemaParam{
 					Properties: map[string]interface{}{},
+				},
+			},
+			{
+				Name:        "quickjs",
+				Description: anthropic.String("Run a JavaScript function"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]interface{}{
+						"code": map[string]interface{}{
+							"type":        "string",
+							"description": "The JavaScript code to run",
+						},
+					},
 				},
 			},
 		}
@@ -157,6 +144,22 @@ func NewLLM(
 					}
 				case "uuid":
 					response = uuid.New().String()
+				case "quickjs":
+					var input struct {
+						Code string `json:"code"`
+					}
+
+					err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
+					if err != nil {
+						panic(err)
+					}
+					ctx, err := quickjs.NewContext()
+					if err != nil {
+						panic(err)
+					}
+
+					res, _ := ctx.Eval(input.Code, nil)
+					response = fmt.Sprintf("%v", res)
 				default:
 					response = "Unknown tool: " + block.Name
 				}
