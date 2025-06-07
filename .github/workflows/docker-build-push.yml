@@ -20,14 +20,16 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+    
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: wholelottahoopla/lucksacks:${GITHUB_SHA}
+          tags: 
+            wholelottahoopla/lucksacks:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max 
       - name: print image tag
         run: |
-          echo "Image tag: wholelottahoopla/lucksacks:${GITHUB_SHA}"
+          echo "Image tag: wholelottahoopla/lucksacks:${{ github.sha }}"
