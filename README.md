@@ -67,3 +67,13 @@ docker-compose restart ngrok
         --private-key-file=/Users/robertwendt/.ssh/id_ed25519 
 
 ```
+
+## create secret from .env file 
+
+```sh
+# delete if it already exists
+kubectl delete secret lucksacks-secret
+
+# create secret from .env file
+kubectl create secret generic lucksacks-secret --from-env-file=.env
+```
