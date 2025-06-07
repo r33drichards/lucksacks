@@ -8,6 +8,10 @@ spec:
     matchLabels:
       {{- include "http.selectorLabels" . | nindent 6 }}
   ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
     - {}
   policyTypes:
     - Ingress 
