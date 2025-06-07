@@ -3,8 +3,13 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"flag"
+	"path/filepath"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/homedir"
 
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
@@ -49,9 +54,31 @@ func logErrMsgSlack(w http.ResponseWriter, msg string) {
 func main() {
 	anthropicClient := anthropic.NewClient()
 
+	var kubeconfig *string
+	if home := homedir.HomeDir(); home != "" {
+		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
+	} else {
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	}
+	flag.Parse()
+
+	// use the current context in kubeconfig
+	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	// create the clientset
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	messageStore := NewSlackMessageStore(NewLLM(anthropicClient, clientset))
+
 	messageStore := NewSlackMessageStore(NewLLM(anthropicClient))
 
-	err := sentry.Init(sentry.ClientOptions{
+	err = sentry.Init(sentry.ClientOptions{
 		Dsn: "https://4ee2152b98494a29a5fff791a31cf9db@o514182.ingest.sentry.io/4504227079651328",
 		// Set TracesSampleRate to 1.0 to capture 100%
 		// of transactions for performance monitoring.
