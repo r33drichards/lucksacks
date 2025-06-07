@@ -54,3 +54,16 @@ docker-compose logs -tf app
 docker-compose restart ngrok
 ```
 
+
+
+# k8s deployment
+
+```
+      yes y | flux bootstrap git \
+        --url=ssh://git@github.com/r33drichards/lucksacks.git \
+        --branch=main \
+        --path=charts \
+        --namespace=default \
+        --private-key-file=/Users/robertwendt/.ssh/id_ed25519 
+
+```
