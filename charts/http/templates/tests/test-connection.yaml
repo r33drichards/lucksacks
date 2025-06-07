@@ -13,4 +13,3 @@ spec:
       command: ['wget']
       args: ['{{ include "http.fullname" . }}:{{ .Values.service.port }}']
   restartPolicy: Never
-c
