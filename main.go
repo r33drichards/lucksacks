@@ -89,9 +89,7 @@ func main() {
 		}
 
 		switch s.Command {
-		case "/echo":
-			logErrMsgSlack(w, s.Text)
-			return
+
 		case "/anagram":
 			anagram(s, api, w)
 			return

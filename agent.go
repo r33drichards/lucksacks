@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/google/uuid"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -61,6 +62,22 @@ func NewLLM(
 						},
 					},
 				},
+			},
+			{
+				Name:        "jwtdecode",
+				Description: anthropic.String("Decode a JWT token"),
+				InputSchema: anthropic.ToolInputSchemaParam{
+					Properties: map[string]interface{}{
+						"token": map[string]interface{}{
+							"type":        "string",
+							"description": "The JWT token to decode",
+						},
+					},
+				},
+			},
+			{
+				Name:        "uuid",
+				Description: anthropic.String("Generate a UUID"),
 			},
 		}
 
@@ -121,6 +138,24 @@ func NewLLM(
 					}
 
 					response = base64.StdEncoding.EncodeToString([]byte(input.Text))
+				case "jwtdecode":
+					var input struct {
+						Token string `json:"token"`
+					}
+
+					err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
+					if err != nil {
+						panic(err)
+					}
+
+					response, err = jwtdecode(input.Token)
+					if err != nil {
+						panic(err)
+					}
+				case "uuid":
+					response = uuid.New().String()
+				default:
+					response = "Unknown tool: " + block.Name
 				}
 
 				b, err := json.Marshal(response)
