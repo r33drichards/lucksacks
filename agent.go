@@ -266,7 +266,6 @@ func (s *SlackMessageStore) Loop(
 		return nil, err
 	}
 
-
 	return message, nil
 }
 
