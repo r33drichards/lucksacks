@@ -284,5 +284,9 @@ func main() {
 	})
 	log.Println("server listening")
 	// TODO: port should be env var
-	http.ListenAndServe(":3000", nil)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3000"
+	}
+	http.ListenAndServe(":"+port, nil)
 }

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -104,6 +106,72 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 				}
 			}
 
+		})
+	}
+}
+
+func Test_handleMessage(t *testing.T) {
+
+	var jsonString = "{\"text\": \"test\"}"
+	msg, err := json.Marshal(jsonString)
+	if err != nil {
+		t.Errorf("json.Marshal() error = %v", err)
+	}
+
+	fmt.Println(msg)
+	type args struct {
+		message        *anthropic.Message
+		messageStore   MessageStore
+		conversationID string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		// TODO: Add test cases.
+		{
+			name: "test",
+			args: args{
+				message: &anthropic.Message{
+					Role: "assistant",
+					Content: []anthropic.ContentBlockUnion{
+						{
+							Type:      "tool_use",
+							ToolUseID: "test-id",
+							Name:      "base64",
+						},
+					},
+				},
+				messageStore: &SlackMessageStore{
+					messages: map[string][]anthropic.MessageParam{
+						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
+					},
+					llm: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+						return "test", nil
+					},
+				},
+				conversationID: "test",
+			},
+			want:    "test",
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := handleMessage(
+				tt.args.message,
+				tt.args.messageStore,
+				tt.args.conversationID,
+			)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("handleMessage() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("handleMessage() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }

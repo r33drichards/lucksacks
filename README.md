@@ -13,7 +13,7 @@ docker-compose up -d
 
 
 ```
- nix shell nixpkgs#cloudflared -c cloudflared tunnel --url http://localhost:3000  
+ nix shell nixpkgs#cloudflared -c cloudflared tunnel --url http://localhost:3333  
 ```
 
 

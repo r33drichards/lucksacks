@@ -11,6 +11,9 @@
             "mode": "exec",
             "program": "${workspaceFolder}/lucksacks",
             "envFile": "${workspaceFolder}/.env",
+            "env": {
+                "PORT": "3333"
+            }
         },
         // go run workspaceFolder/main.go
         {
