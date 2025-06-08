@@ -290,7 +290,9 @@ func callLLm(
 	}
 	counter := 0
 	maxLoops := 10
+	log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter, "loop": resp.Loop}).Info("should loop")
 	if resp.Loop {
+		log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter, "loop": resp.Loop}).Info("looping")
 		counter++
 		if counter > maxLoops {
 			log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter}).Info("max loops reached")
