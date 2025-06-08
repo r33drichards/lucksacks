@@ -82,7 +82,9 @@ func NewLLM(
 			MaxTokens: 20_000,
 			Messages:  messages,
 			Tools:     tools,
-			Thinking:  anthropic.ThinkingConfigParamUnion{OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 1024}},
+			Thinking: anthropic.ThinkingConfigParamUnion{
+				OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 1024},
+			},
 		})
 
 		if err != nil {

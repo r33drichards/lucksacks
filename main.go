@@ -52,11 +52,7 @@ func main() {
 	messageStore := NewSlackMessageStore(NewLLM(anthropicClient))
 
 	err := sentry.Init(sentry.ClientOptions{
-		Dsn: "https://4ee2152b98494a29a5fff791a31cf9db@o514182.ingest.sentry.io/4504227079651328",
-		// Set TracesSampleRate to 1.0 to capture 100%
-		// of transactions for performance monitoring.
-		// We recommend adjusting this value in production,
-		TracesSampleRate: 1.0,
+		Dsn: "https://7a6c1d7fa62d70dffc54d0d4d8a92efb@o4507134751408128.ingest.us.sentry.io/4509460668809216",
 	})
 	if err != nil {
 		log.Fatalf("sentry.Init: %s", err)
@@ -233,6 +229,7 @@ func main() {
 					}
 					message, err := messageStore.CallLLM(threadTS, ev.Text)
 					if err != nil {
+						sentry.CaptureException(err)
 						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
 					}
 					_, _, err = api.PostMessage(
@@ -241,6 +238,7 @@ func main() {
 						slack.MsgOptionTS(threadTS),
 					)
 					if err != nil {
+						sentry.CaptureException(err)
 						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread")
 					}
 				case *slackevents.MessageEvent:
@@ -255,6 +253,7 @@ func main() {
 						}).Info("message event")
 						message, err := messageStore.CallLLM(ev.ThreadTimeStamp, ev.Text)
 						if err != nil {
+							sentry.CaptureException(err)
 							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
 						}
 						_, _, err = api.PostMessage(
@@ -263,6 +262,7 @@ func main() {
 							slack.MsgOptionTS(ev.ThreadTimeStamp),
 						)
 						if err != nil {
+							sentry.CaptureException(err)
 							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread (message event)")
 						}
 					}
