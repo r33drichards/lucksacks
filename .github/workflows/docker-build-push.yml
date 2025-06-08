@@ -11,11 +11,7 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-      # exit 2 to test the slack notification
-      - name: Exit 2
-        run: |
-          echo "Exiting 2"
-          exit 2
+
       - name: Checkout code
         uses: actions/checkout@v4
 
