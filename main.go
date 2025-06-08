@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 
 	"github.com/anthropics/anthropic-sdk-go"
 
@@ -229,8 +230,9 @@ func main() {
 					}
 					message, err := messageStore.CallLLM(threadTS, ev.Text)
 					if err != nil {
+
 						sentry.CaptureException(err)
-						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
+						log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
 					}
 					_, _, err = api.PostMessage(
 						ev.Channel,
@@ -239,7 +241,7 @@ func main() {
 					)
 					if err != nil {
 						sentry.CaptureException(err)
-						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread")
+						log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread")
 					}
 				case *slackevents.MessageEvent:
 					log.Println(ev.Channel, ev.Text)
@@ -254,7 +256,7 @@ func main() {
 						message, err := messageStore.CallLLM(ev.ThreadTimeStamp, ev.Text)
 						if err != nil {
 							sentry.CaptureException(err)
-							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
+							log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
 						}
 						_, _, err = api.PostMessage(
 							ev.Channel,
@@ -263,7 +265,7 @@ func main() {
 						)
 						if err != nil {
 							sentry.CaptureException(err)
-							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread (message event)")
+							log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
 						}
 					}
 				}
