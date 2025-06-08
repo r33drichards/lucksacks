@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rosbit/go-quickjs"
+	"github.com/slack-go/slack"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ func handleMessage(
 	message *anthropic.Message,
 	messageStore MessageStore,
 	conversationID string,
-) (string, error) {
+) (*LLMResponse, error) {
 	content := ""
 
 	for _, block := range message.Content {
@@ -49,7 +50,7 @@ func handleMessage(
 				err := json.Unmarshal(raw, &input)
 
 				if err != nil {
-					return "", errors.Wrap(err, "failed to unmarshal input")
+					return nil, errors.Wrap(err, "failed to unmarshal input")
 				}
 
 				response = base64.StdEncoding.EncodeToString([]byte(input.Text))
@@ -60,12 +61,12 @@ func handleMessage(
 
 				err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
 				if err != nil {
-					return "", errors.Wrap(err, "failed to unmarshal input")
+					return nil, errors.Wrap(err, "failed to unmarshal input")
 				}
 
 				response, err = jwtdecode(input.Token)
 				if err != nil {
-					return "", errors.Wrap(err, "failed to decode JWT")
+					return nil, errors.Wrap(err, "failed to decode JWT")
 				}
 			case "uuid":
 				response = uuid.New().String()
@@ -76,16 +77,16 @@ func handleMessage(
 
 				err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
 				if err != nil {
-					return "", errors.Wrap(err, "failed to create context")
+					return nil, errors.Wrap(err, "failed to create context")
 				}
 				ctx, err := quickjs.NewContext()
 				if err != nil {
-					return "", errors.Wrap(err, "failed to create context")
+					return nil, errors.Wrap(err, "failed to create context")
 				}
 
 				res, err := ctx.Eval(input.Code, nil)
 				if err != nil {
-					return "", errors.Wrap(err, "failed to evaluate code")
+					return nil, errors.Wrap(err, "failed to evaluate code")
 				}
 				response = fmt.Sprintf("%v", res)
 			default:
@@ -98,26 +99,29 @@ func handleMessage(
 		}
 	}
 
-	if len(toolResults) == 0 {
-		return content, nil
-	}
-
 	mesagesToStore := []anthropic.MessageParam{message.ToParam()}
 	if content != "" {
 		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
 	}
 	if len(toolResults) > 0 {
 		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
-		
+
 	}
 
 	messageStore.AppendMessages(conversationID, mesagesToStore)
-	return content, nil
+	return &LLMResponse{
+		Message: content,
+		Loop:    len(toolResults) > 0,
+	}, nil
 }
 
 // LLMInterface defines the interface for LLMs with a Prompt method.
 type LLMInterface interface {
-	Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+	Prompt(
+		messages []anthropic.MessageParam,
+		messageStore MessageStore,
+		conversationID string,
+	) (*LLMResponse, error)
 }
 
 // LLM is a struct that holds the anthropic client and any other config.
@@ -126,7 +130,7 @@ type LLM struct {
 }
 
 // Prompt implements the LLMInterface for LLM.
-func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error) {
 	toolParams := []anthropic.ToolParam{
 		{
 			Name:        "base64",
@@ -188,13 +192,13 @@ func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStor
 	})
 
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	content, err := handleMessage(message, messageStore, conversationID)
+	resp, err := handleMessage(message, messageStore, conversationID)
 	if err != nil {
-		return "", errors.Wrap(err, "couldn't handle message")
+		return nil, errors.Wrap(err, "couldn't handle message")
 	}
-	return content, nil
+	return resp, nil
 }
 
 // NewLLM returns a new LLM struct implementing LLMInterface.
@@ -202,10 +206,20 @@ func NewLLM(client anthropic.Client) *LLM {
 	return &LLM{client: client}
 }
 
+type LLMResponse struct {
+	Message string
+	Loop    bool
+}
+
 type MessageStore interface {
-	CallLLM(conversationID string, text string) (string, error)
+	CallLLM(conversationID string, text string) (*LLMResponse, error)
 	AppendMessages(conversationID string, message []anthropic.MessageParam) error
 	GetMessages() map[string][]anthropic.MessageParam
+	Loop(
+		conversationID string,
+		api *slack.Client,
+		reqID string,
+	) (*LLMResponse, error)
 }
 
 var _ MessageStore = &SlackMessageStore{}
@@ -215,9 +229,18 @@ type SlackMessageStore struct {
 	llm      LLMInterface
 }
 
-func (s *SlackMessageStore) CallLLM(conversationID string, text string) (string, error) {
+func (s *SlackMessageStore) CallLLM(conversationID string, text string) (*LLMResponse, error) {
 	s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
-	return s.llm.Prompt(s.messages[conversationID], s, conversationID)
+	message, err := s.llm.Prompt(
+		s.messages[conversationID],
+		s,
+		conversationID,
+	)
+	if err != nil {
+		return nil, errors.Wrap(err, "couldn't call LLM")
+	}
+
+	return message, nil
 }
 
 func (s *SlackMessageStore) AppendMessages(conversationID string, message []anthropic.MessageParam) error {
@@ -227,6 +250,25 @@ func (s *SlackMessageStore) AppendMessages(conversationID string, message []anth
 
 func (s *SlackMessageStore) GetMessages() map[string][]anthropic.MessageParam {
 	return s.messages
+}
+
+func (s *SlackMessageStore) Loop(
+	conversationID string,
+	api *slack.Client,
+	reqID string,
+) (*LLMResponse, error) {
+	message, err := s.llm.Prompt(
+		s.messages[conversationID],
+		s,
+		conversationID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	s.AppendMessages(conversationID, []anthropic.MessageParam{anthropic.NewAssistantMessage(anthropic.NewTextBlock(message.Message))})
+
+	return message, nil
 }
 
 func NewSlackMessageStore(

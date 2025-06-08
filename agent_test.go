@@ -4,16 +4,17 @@ import (
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/google/go-cmp/cmp"
 )
 
 // Add this mock type to allow function-based mocking of LLMInterface
 // mockLLM implements LLMInterface for testing
 
 type mockLLM struct {
-	fn func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+	fn func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error)
 }
 
-func (m *mockLLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+func (m *mockLLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error) {
 	return m.fn(messages, messageStore, conversationID)
 }
 
@@ -46,8 +47,8 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 			name: "test",
 			fields: fields{
 				messages: make(map[string][]anthropic.MessageParam),
-				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
-					return "test", nil
+				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error) {
+					return &LLMResponse{Message: "test", Loop: false}, nil
 				}},
 			},
 			args: args{
@@ -66,8 +67,8 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 				messages: map[string][]anthropic.MessageParam{
 					"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
 				},
-				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
-					return "test", nil
+				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error) {
+					return &LLMResponse{Message: "test", Loop: false}, nil
 				}},
 			},
 			args: args{
@@ -147,7 +148,7 @@ func Test_handleMessage(t *testing.T) {
 	tests := []struct {
 		name              string
 		args              args
-		want              string
+		want              *LLMResponse
 		wantErr           bool
 		messageStoreState map[string][]anthropic.MessageParam
 	}{
@@ -160,13 +161,10 @@ func Test_handleMessage(t *testing.T) {
 					messages: map[string][]anthropic.MessageParam{
 						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
 					},
-					llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
-						return "test", nil
-					}},
 				},
 				conversationID: "test",
 			},
-			want:    "\nbase64: \ndGVzdA==",
+			want:    &LLMResponse{Message: "\nbase64: \ndGVzdA==", Loop: true},
 			wantErr: false,
 			messageStoreState: map[string][]anthropic.MessageParam{
 				"test": {
@@ -196,7 +194,8 @@ func Test_handleMessage(t *testing.T) {
 				t.Errorf("handleMessage() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if got != tt.want {
+			diff := cmp.Diff(got, tt.want)
+			if diff != "" {
 				t.Errorf("handleMessage() = %v, want %v", got, tt.want)
 			}
 			// if !reflect.DeepEqual(tt.args.messageStore.GetMessages(), tt.messageStoreState) {
