@@ -11,6 +11,11 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
+      # exit 2 to test the slack notification
+      - name: Exit 2
+        run: |
+          echo "Exiting 2"
+          exit 2
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -77,3 +82,13 @@ jobs:
             git commit -m "chore: bump Helm chart patch version to $NEW_VERSION"
             git push
           fi
+
+      - name: Notify Slack Action
+        uses: ravsamhq/notify-slack-action@2.3.0
+        if: ${{ always() && github.ref_name == 'main' }}
+        with:
+          status: ${{ job.status }}
+          notify_when: "failure"
+          notification_title: "{workflow} is failing"
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.ACTION_MONITORING_SLACK }}
