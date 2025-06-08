@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -63,12 +62,12 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 			args: args{
 				conversationID: "test",
 				message: []anthropic.MessageParam{
-					anthropic.NewAssistantMessage(anthropic.NewTextBlock("test")),
+					anthropic.NewAssistantMessage(anthropic.NewTextBlock("hello")),
 				},
 			},
 			expectedMessages: []anthropic.MessageParam{
 				anthropic.NewUserMessage(anthropic.NewTextBlock("test")),
-				anthropic.NewAssistantMessage(anthropic.NewTextBlock("test")),
+				anthropic.NewAssistantMessage(anthropic.NewTextBlock("hello")),
 			},
 		},
 	}
@@ -92,8 +91,16 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 				for _, content := range zippedContent {
 					gotContent := content[0]
 					wantContent := content[1]
-					fmt.Printf("gotContent: %v\n", gotContent)
-					fmt.Printf("wantContent: %v\n", wantContent)
+					if gotContent.OfText.Text != wantContent.OfText.Text {
+						t.Errorf("SlackMessageStore.AppendMessages() = %v, want %v", gotContent, wantContent)
+					}
+					// if gotContent.OfThinking.Thinking != wantContent.OfThinking.Thinking {
+					// 	t.Errorf("SlackMessageStore.AppendMessages() = %v, want %v", gotContent, wantContent)
+					// }
+					// if gotContent.OfToolResult.Content[0].OfText.Text != wantContent.OfToolResult.Content[0].OfText.Text {
+					// 	t.Errorf("SlackMessageStore.AppendMessages() = %v, want %v", gotContent, wantContent)
+					// }
+
 				}
 			}
 
