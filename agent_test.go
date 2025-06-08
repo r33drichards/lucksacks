@@ -57,7 +57,7 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 					"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
 				},
 				llm: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
-					return "2nd", nil
+					return "test", nil
 				},
 			},
 			args: args{
