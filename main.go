@@ -228,21 +228,7 @@ func main() {
 					if threadTS == "" {
 						threadTS = ev.TimeStamp
 					}
-					message, err := messageStore.CallLLM(threadTS, ev.Text)
-					if err != nil {
-
-						sentry.CaptureException(err)
-						log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
-					}
-					_, _, err = api.PostMessage(
-						ev.Channel,
-						slack.MsgOptionText(message, false),
-						slack.MsgOptionTS(threadTS),
-					)
-					if err != nil {
-						sentry.CaptureException(err)
-						log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread")
-					}
+					callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID, ev)
 				case *slackevents.MessageEvent:
 					log.Println(ev.Channel, ev.Text)
 					if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
@@ -253,20 +239,7 @@ func main() {
 							"thread":  ev.ThreadTimeStamp,
 							"user":    ev.User,
 						}).Info("message event")
-						message, err := messageStore.CallLLM(ev.ThreadTimeStamp, ev.Text)
-						if err != nil {
-							sentry.CaptureException(err)
-							log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
-						}
-						_, _, err = api.PostMessage(
-							ev.Channel,
-							slack.MsgOptionText(message, false),
-							slack.MsgOptionTS(ev.ThreadTimeStamp),
-						)
-						if err != nil {
-							sentry.CaptureException(err)
-							log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
-						}
+						callLLm(ev.ThreadTimeStamp, ev.Text, messageStore, ev.Channel, ev.ThreadTimeStamp, api, reqID, ev)
 					}
 				}
 			}
@@ -289,4 +262,30 @@ func main() {
 		port = "3000"
 	}
 	http.ListenAndServe(":"+port, nil)
+}
+
+func callLLm(
+	timestamp string,
+	message string,
+	messageStore MessageStore,
+	channel string,
+	thread string,
+	api *slack.Client,
+	reqID string,
+	ev *slackevents.MessageEvent,
+) {
+	message, err := messageStore.CallLLM(thread, message)
+	if err != nil {
+		sentry.CaptureException(err)
+		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
+	}
+	_, _, err = api.PostMessage(
+		ev.Channel,
+		slack.MsgOptionText(message, false),
+		slack.MsgOptionTS(ev.ThreadTimeStamp),
+	)
+	if err != nil {
+		sentry.CaptureException(err)
+		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
+	}
 }

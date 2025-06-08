@@ -103,12 +103,14 @@ func handleMessage(
 	}
 
 	mesagesToStore := []anthropic.MessageParam{message.ToParam()}
-	if len(toolResults) > 0 {
-		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
-	}
 	if content != "" {
 		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
 	}
+	if len(toolResults) > 0 {
+		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
+		
+	}
+
 	messageStore.AppendMessages(conversationID, mesagesToStore)
 	return content, nil
 }
