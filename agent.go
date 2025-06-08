@@ -172,7 +172,7 @@ func NewLLM(
 		}
 
 		mesagesToStore := []anthropic.MessageParam{message.ToParam()}
-		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(toolResults...))
+		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
 		messageStore.AppendMessages(conversationID, mesagesToStore)
 		messagesToStore := []anthropic.MessageParam{message.ToParam()}
 		messagesToStore = append(messagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
