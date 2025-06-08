@@ -11,6 +11,9 @@ jobs:
   go-checks:
     name: Go Checks
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        check: [fmt, vet, test]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,20 +36,20 @@ jobs:
       - name: Download Go modules
         run: go mod download
 
-      - name: Run go fmt
+      - name: Run go check
         run: |
-          output=$(gofmt -l .)
-          if [ -n "$output" ]; then
-            echo "Go files must be formatted. Run 'gofmt -w .'"
-            echo "$output"
-            exit 1
+          if [ "${{ matrix.check }}" = "fmt" ]; then
+            output=$(gofmt -l .)
+            if [ -n "$output" ]; then
+              echo "Go files must be formatted. Run 'gofmt -w .'"
+              echo "$output"
+              exit 1
+            fi
+          elif [ "${{ matrix.check }}" = "vet" ]; then
+            go vet ./...
+          elif [ "${{ matrix.check }}" = "test" ]; then
+            go test -v ./...
           fi
-
-      - name: Run go vet
-        run: go vet ./...
-
-      - name: Run go test
-        run: go test -v ./...
 
   build-and-push:
     name: Build and Push Docker/Helm
