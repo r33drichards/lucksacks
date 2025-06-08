@@ -113,89 +113,91 @@ func handleMessage(
 	return content, nil
 }
 
-func NewLLM(
-	client anthropic.Client,
-) func(
-	messages []anthropic.MessageParam,
-	messageStore MessageStore,
-	conversationID string,
-) (string, error) {
-	return func(
-		messages []anthropic.MessageParam,
-		messageStore MessageStore,
-		conversationID string,
-	) (string, error) {
+// LLMInterface defines the interface for LLMs with a Prompt method.
+type LLMInterface interface {
+	Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+}
 
-		toolParams := []anthropic.ToolParam{
-			{
-				Name:        "base64",
-				Description: anthropic.String("Base64 encode a string"),
-				InputSchema: anthropic.ToolInputSchemaParam{
-					Properties: map[string]interface{}{
-						"text": map[string]interface{}{
-							"type":        "string",
-							"description": "The text to encode",
-						},
+// LLM is a struct that holds the anthropic client and any other config.
+type LLM struct {
+	client anthropic.Client
+}
+
+// Prompt implements the LLMInterface for LLM.
+func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+	toolParams := []anthropic.ToolParam{
+		{
+			Name:        "base64",
+			Description: anthropic.String("Base64 encode a string"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"text": map[string]interface{}{
+						"type":        "string",
+						"description": "The text to encode",
 					},
 				},
 			},
-			{
-				Name:        "jwtdecode",
-				Description: anthropic.String("Decode a JWT token"),
-				InputSchema: anthropic.ToolInputSchemaParam{
-					Properties: map[string]interface{}{
-						"token": map[string]interface{}{
-							"type":        "string",
-							"description": "The JWT token to decode",
-						},
+		},
+		{
+			Name:        "jwtdecode",
+			Description: anthropic.String("Decode a JWT token"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"token": map[string]interface{}{
+						"type":        "string",
+						"description": "The JWT token to decode",
 					},
 				},
 			},
-			{
-				Name:        "uuid",
-				Description: anthropic.String("Generate a UUID"),
-				InputSchema: anthropic.ToolInputSchemaParam{
-					Properties: map[string]interface{}{},
-				},
+		},
+		{
+			Name:        "uuid",
+			Description: anthropic.String("Generate a UUID"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{},
 			},
-			{
-				Name:        "quickjs",
-				Description: anthropic.String("Run a JavaScript function"),
-				InputSchema: anthropic.ToolInputSchemaParam{
-					Properties: map[string]interface{}{
-						"code": map[string]interface{}{
-							"type":        "string",
-							"description": "The JavaScript code to run",
-						},
+		},
+		{
+			Name:        "quickjs",
+			Description: anthropic.String("Run a JavaScript function"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"code": map[string]interface{}{
+						"type":        "string",
+						"description": "The JavaScript code to run",
 					},
 				},
 			},
-		}
-
-		tools := make([]anthropic.ToolUnionParam, len(toolParams))
-		for i, toolParam := range toolParams {
-			tools[i] = anthropic.ToolUnionParam{OfTool: &toolParam}
-		}
-
-		message, err := client.Messages.New(context.TODO(), anthropic.MessageNewParams{
-			Model:     anthropic.ModelClaude4Sonnet20250514,
-			MaxTokens: 20_000,
-			Messages:  messages,
-			Tools:     tools,
-			Thinking: anthropic.ThinkingConfigParamUnion{
-				OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 1024}},
-		})
-
-		if err != nil {
-			return "", err
-		}
-		content, err := handleMessage(message, messageStore, conversationID)
-		if err != nil {
-			return "", errors.Wrap(err, "couldn't handle message")
-		}
-		return content, nil
+		},
 	}
 
+	tools := make([]anthropic.ToolUnionParam, len(toolParams))
+	for i, toolParam := range toolParams {
+		tools[i] = anthropic.ToolUnionParam{OfTool: &toolParam}
+	}
+
+	message, err := l.client.Messages.New(context.TODO(), anthropic.MessageNewParams{
+		Model:     anthropic.ModelClaude4Sonnet20250514,
+		MaxTokens: 20_000,
+		Messages:  messages,
+		Tools:     tools,
+		Thinking: anthropic.ThinkingConfigParamUnion{
+			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 1024}},
+	})
+
+	if err != nil {
+		return "", err
+	}
+	content, err := handleMessage(message, messageStore, conversationID)
+	if err != nil {
+		return "", errors.Wrap(err, "couldn't handle message")
+	}
+	return content, nil
+}
+
+// NewLLM returns a new LLM struct implementing LLMInterface.
+func NewLLM(client anthropic.Client) *LLM {
+	return &LLM{client: client}
 }
 
 type MessageStore interface {
@@ -208,12 +210,12 @@ var _ MessageStore = &SlackMessageStore{}
 
 type SlackMessageStore struct {
 	messages map[string][]anthropic.MessageParam
-	llm      func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+	llm      LLMInterface
 }
 
 func (s *SlackMessageStore) CallLLM(conversationID string, text string) (string, error) {
 	s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
-	return s.llm(s.messages[conversationID], s, conversationID)
+	return s.llm.Prompt(s.messages[conversationID], s, conversationID)
 }
 
 func (s *SlackMessageStore) AppendMessages(conversationID string, message []anthropic.MessageParam) error {
@@ -226,11 +228,7 @@ func (s *SlackMessageStore) GetMessages() map[string][]anthropic.MessageParam {
 }
 
 func NewSlackMessageStore(
-	llm func(
-		messages []anthropic.MessageParam,
-		messageStore MessageStore,
-		conversationID string,
-	) (string, error),
+	llm LLMInterface,
 ) *SlackMessageStore {
 	return &SlackMessageStore{
 		messages: make(map[string][]anthropic.MessageParam),

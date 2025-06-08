@@ -6,6 +6,17 @@ import (
 	"github.com/anthropics/anthropic-sdk-go"
 )
 
+// Add this mock type to allow function-based mocking of LLMInterface
+// mockLLM implements LLMInterface for testing
+
+type mockLLM struct {
+	fn func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+}
+
+func (m *mockLLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+	return m.fn(messages, messageStore, conversationID)
+}
+
 func zip[T any](a, b []T) [][]T {
 	acc := make([][]T, 0, len(a))
 	for i := 0; i < len(a); i++ {
@@ -17,7 +28,7 @@ func zip[T any](a, b []T) [][]T {
 func TestSlackMessageStore_AppendMessages(t *testing.T) {
 	type fields struct {
 		messages map[string][]anthropic.MessageParam
-		llm      func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
+		llm      LLMInterface
 	}
 	type args struct {
 		conversationID string
@@ -35,9 +46,9 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 			name: "test",
 			fields: fields{
 				messages: make(map[string][]anthropic.MessageParam),
-				llm: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
 					return "test", nil
-				},
+				}},
 			},
 			args: args{
 				conversationID: "test",
@@ -55,9 +66,9 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 				messages: map[string][]anthropic.MessageParam{
 					"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
 				},
-				llm: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+				llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
 					return "test", nil
-				},
+				}},
 			},
 			args: args{
 				conversationID: "test",
@@ -149,9 +160,9 @@ func Test_handleMessage(t *testing.T) {
 					messages: map[string][]anthropic.MessageParam{
 						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
 					},
-					llm: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
+					llm: &mockLLM{fn: func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error) {
 						return "test", nil
-					},
+					}},
 				},
 				conversationID: "test",
 			},
