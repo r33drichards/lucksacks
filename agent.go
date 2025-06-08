@@ -186,6 +186,8 @@ type MessageStore interface {
 	AppendMessages(conversationID string, message []anthropic.MessageParam) error
 }
 
+var _ MessageStore = &SlackMessageStore{}
+
 type SlackMessageStore struct {
 	messages map[string][]anthropic.MessageParam
 	llm      func(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (string, error)
