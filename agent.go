@@ -106,8 +106,6 @@ func NewLLM(
 			}
 		}
 
-
-
 		toolResults := []anthropic.ContentBlockParamUnion{}
 		for _, block := range message.Content {
 			switch variant := block.AsAny().(type) {
@@ -171,7 +169,7 @@ func NewLLM(
 		if len(toolResults) == 0 {
 			return content, nil
 		}
-		
+
 		mesagesToStore := []anthropic.MessageParam{message.ToParam()}
 		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(toolResults...))
 		messageStore.AppendMessages(conversationID, mesagesToStore)

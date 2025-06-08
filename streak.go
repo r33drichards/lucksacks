@@ -167,8 +167,8 @@ func (basics StreakTable) AddStreak(streak streakEntry) error {
 	if err != nil {
 		log.WithFields(
 			log.Fields{
-				"error": err,
-				"item":  item,
+				"error":  err,
+				"item":   item,
 				"streak": streak,
 			},
 		).Error("failed to add streak")

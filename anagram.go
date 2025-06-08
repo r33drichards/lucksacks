@@ -17,6 +17,7 @@ type Memo map[string]Constructions
 type Dictionary map[string]bool
 
 // file is ~200 kb, binary is ~7.5mb
+//
 //go:embed popular.txt
 var content embed.FS
 
