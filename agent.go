@@ -266,7 +266,6 @@ func (s *SlackMessageStore) Loop(
 		return nil, err
 	}
 
-	s.AppendMessages(conversationID, []anthropic.MessageParam{anthropic.NewAssistantMessage(anthropic.NewTextBlock(message.Message))})
 
 	return message, nil
 }

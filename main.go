@@ -289,6 +289,19 @@ func callLLm(
 		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
 	}
 	if resp.Loop {
-		messageStore.Loop(thread, api, reqID)
+		resp, err = messageStore.Loop(thread, api, reqID)
+		if err != nil {
+			sentry.CaptureException(err)
+			log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to loop")
+		}
+		_, _, err = api.PostMessage(
+			channel,
+			slack.MsgOptionText(resp.Message, false),
+			slack.MsgOptionTS(thread),
+		)
+		if err != nil {
+			sentry.CaptureException(err)
+			log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (loop)")
+		}
 	}
 }
