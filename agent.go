@@ -106,9 +106,7 @@ func NewLLM(
 			}
 		}
 
-		messagesToStore := []anthropic.MessageParam{message.ToParam()}
-		messagesToStore = append(messagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
-		messageStore.AppendMessages(conversationID, messagesToStore)
+
 
 		toolResults := []anthropic.ContentBlockParamUnion{}
 		for _, block := range message.Content {
@@ -173,10 +171,13 @@ func NewLLM(
 		if len(toolResults) == 0 {
 			return content, nil
 		}
-
-		messagesToStore = append(messagesToStore, anthropic.NewAssistantMessage(toolResults...))
+		
+		mesagesToStore := []anthropic.MessageParam{message.ToParam()}
+		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(toolResults...))
+		messageStore.AppendMessages(conversationID, mesagesToStore)
+		messagesToStore := []anthropic.MessageParam{message.ToParam()}
+		messagesToStore = append(messagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
 		messageStore.AppendMessages(conversationID, messagesToStore)
-
 		return content, nil
 	}
 
