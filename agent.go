@@ -26,10 +26,6 @@ func handleMessage(
 			content += block.Text
 			content += "\n"
 
-		case anthropic.ToolUseBlock:
-			inputJSON, _ := json.Marshal(block.Input)
-			content += block.Name + ": " + string(inputJSON)
-			content += "\n"
 		case anthropic.ThinkingBlock:
 			content += block.Thinking
 			content += "\n"
@@ -107,11 +103,13 @@ func handleMessage(
 	}
 
 	mesagesToStore := []anthropic.MessageParam{message.ToParam()}
-	mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
+	if len(toolResults) > 0 {
+		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
+	}
+	if content != "" {
+		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
+	}
 	messageStore.AppendMessages(conversationID, mesagesToStore)
-	messagesToStore := []anthropic.MessageParam{message.ToParam()}
-	messagesToStore = append(messagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
-	messageStore.AppendMessages(conversationID, messagesToStore)
 	return content, nil
 }
 
@@ -203,6 +201,7 @@ func NewLLM(
 type MessageStore interface {
 	CallLLM(conversationID string, text string) (string, error)
 	AppendMessages(conversationID string, message []anthropic.MessageParam) error
+	GetMessages() map[string][]anthropic.MessageParam
 }
 
 var _ MessageStore = &SlackMessageStore{}
@@ -220,6 +219,10 @@ func (s *SlackMessageStore) CallLLM(conversationID string, text string) (string,
 func (s *SlackMessageStore) AppendMessages(conversationID string, message []anthropic.MessageParam) error {
 	s.messages[conversationID] = append(s.messages[conversationID], message...)
 	return nil
+}
+
+func (s *SlackMessageStore) GetMessages() map[string][]anthropic.MessageParam {
+	return s.messages
 }
 
 func NewSlackMessageStore(

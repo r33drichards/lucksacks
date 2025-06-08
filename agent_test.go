@@ -1,6 +1,7 @@
 package main
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -106,24 +107,10 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 
 		})
 	}
+
 }
 
 func Test_handleMessage(t *testing.T) {
-
-	// "server tool use block": {
-	// 	events: []string{
-	// 		`{"type": "message_start", "message": {}}`,
-	// 		`{"type": "content_block_start": "index": 0, "content_block": {"type": "server_tool_use", "id": "srvtoolu_id", "name": "web_search", input: {}}}`,
-	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": ""}}`,
-	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"query\": \"weat"}}`,
-	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "her\"}"}}`,
-	// 		`{"type": "content_block_stop", "index": 0}`,
-	// 		`{"type": "message_stop"}`,
-	// 	},
-	// 	expected: anthropic.Message{Content: []anthropic.ContentBlockUnion{
-	// 		{Type: "server_tool_use", ID: "srvtoolu_id", Name: "web_search", Input: []byte(`{"query": "weather"}`)},
-	// 	}},
-	// },
 	events := []string{
 		`{"type": "message_start", "message": {}}`,
 		`{"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "toolu_id", "name": "base64", "input": {}}}`,
@@ -148,10 +135,11 @@ func Test_handleMessage(t *testing.T) {
 		conversationID string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name              string
+		args              args
+		want              string
+		wantErr           bool
+		messageStoreState map[string][]anthropic.MessageParam
 	}{
 		// TODO: Add test cases.
 		{
@@ -170,6 +158,21 @@ func Test_handleMessage(t *testing.T) {
 			},
 			want:    "base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
 			wantErr: false,
+			messageStoreState: map[string][]anthropic.MessageParam{
+				"test": {
+					anthropic.NewUserMessage(anthropic.NewTextBlock("test")),
+					anthropic.NewAssistantMessage(anthropic.NewToolUseBlock(
+						"base64",
+						map[string]interface{}{"text": "test"},
+						"tool_use_id",
+					)),
+					anthropic.NewAssistantMessage(anthropic.NewToolResultBlock(
+						"base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
+						"tool_use_id",
+						true,
+					)),
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -185,6 +188,9 @@ func Test_handleMessage(t *testing.T) {
 			}
 			if got != tt.want {
 				t.Errorf("handleMessage() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(tt.args.messageStore.GetMessages(), tt.messageStoreState) {
+				t.Errorf("handleMessage() messageStoreState = %v, want %v", tt.args.messageStore.GetMessages(), tt.messageStoreState)
 			}
 		})
 	}
