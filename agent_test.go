@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -112,13 +110,38 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 
 func Test_handleMessage(t *testing.T) {
 
-	var jsonString = "{\"text\": \"test\"}"
-	msg, err := json.Marshal(jsonString)
-	if err != nil {
-		t.Errorf("json.Marshal() error = %v", err)
+	// "server tool use block": {
+	// 	events: []string{
+	// 		`{"type": "message_start", "message": {}}`,
+	// 		`{"type": "content_block_start": "index": 0, "content_block": {"type": "server_tool_use", "id": "srvtoolu_id", "name": "web_search", input: {}}}`,
+	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": ""}}`,
+	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"query\": \"weat"}}`,
+	// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "her\"}"}}`,
+	// 		`{"type": "content_block_stop", "index": 0}`,
+	// 		`{"type": "message_stop"}`,
+	// 	},
+	// 	expected: anthropic.Message{Content: []anthropic.ContentBlockUnion{
+	// 		{Type: "server_tool_use", ID: "srvtoolu_id", Name: "web_search", Input: []byte(`{"query": "weather"}`)},
+	// 	}},
+	// },
+	events := []string{
+		`{"type": "message_start", "message": {}}`,
+		`{"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "toolu_id", "name": "base64", "input": {}}}`,
+		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"text\":"}}`,
+		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": " \"test\"}"}}`,
+		`{"type": "content_block_stop", "index": 0}`,
+		`{"type": "message_stop"}`,
+	}
+	message := anthropic.Message{}
+	for _, eventStr := range events {
+		event := anthropic.MessageStreamEventUnion{}
+		err := (&event).UnmarshalJSON([]byte(eventStr))
+		if err != nil {
+			t.Fatal(err)
+		}
+		(&message).Accumulate(event)
 	}
 
-	fmt.Println(msg)
 	type args struct {
 		message        *anthropic.Message
 		messageStore   MessageStore
@@ -134,16 +157,7 @@ func Test_handleMessage(t *testing.T) {
 		{
 			name: "test",
 			args: args{
-				message: &anthropic.Message{
-					Role: "assistant",
-					Content: []anthropic.ContentBlockUnion{
-						{
-							Type:      "tool_use",
-							ToolUseID: "test-id",
-							Name:      "base64",
-						},
-					},
-				},
+				message: &message,
 				messageStore: &SlackMessageStore{
 					messages: map[string][]anthropic.MessageParam{
 						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
@@ -154,7 +168,7 @@ func Test_handleMessage(t *testing.T) {
 				},
 				conversationID: "test",
 			},
-			want:    "test",
+			want:    "base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
 			wantErr: false,
 		},
 	}
