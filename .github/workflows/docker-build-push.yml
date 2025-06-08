@@ -127,7 +127,9 @@ jobs:
           # Only commit if there are changes
           if ! git diff --quiet; then
             git add "$CHART_FILE"
-            git commit -m "chore: bump Helm chart patch version to $NEW_VERSION"
+            git commit -m "chore: bump Helm chart patch version to $NEW_VERSION
+            ${{ github.event.head_commit.message }}
+            "
             git push
           fi
 
