@@ -115,7 +115,7 @@ func NewLLM(
 			switch variant := block.AsAny().(type) {
 			case anthropic.ToolUseBlock:
 
-				var response interface{}
+				var response string
 				switch block.Name {
 				case "base64":
 					var input struct {
@@ -164,13 +164,8 @@ func NewLLM(
 					response = "Unknown tool: " + block.Name
 				}
 
-				b, err := json.Marshal(response)
-				if err != nil {
-					panic(err)
-				}
-
-				content += "\n" + block.Name + ": \n" + string(b)
-				toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, string(b), false))
+				content += "\n" + block.Name + ": \n" + response
+				toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, response, false))
 
 			}
 		}
