@@ -288,7 +288,24 @@ func callLLm(
 		sentry.CaptureException(err)
 		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
 	}
+	counter := 0
+	maxLoops := 10
 	if resp.Loop {
+		counter++
+		if counter > maxLoops {
+			log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter}).Info("max loops reached")
+			_, _, err = api.PostMessage(
+				channel,
+				slack.MsgOptionText("Max loops reached", false),
+				slack.MsgOptionTS(thread),
+			)
+			if err != nil {
+				sentry.CaptureException(err)
+				log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (max loops reached)")
+			}
+			return
+		}
+		log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter}).Info("looping")
 		resp, err = messageStore.Loop(thread, api, reqID)
 		if err != nil {
 			sentry.CaptureException(err)
