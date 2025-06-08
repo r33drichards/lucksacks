@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/pkg/errors"
 	"github.com/rosbit/go-quickjs"
 
 	"github.com/anthropics/anthropic-sdk-go"
@@ -120,7 +121,7 @@ func NewLLM(
 
 					err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
 					if err != nil {
-						panic(err)
+						return "", errors.Wrap(err, "failed to unmarshal input")
 					}
 
 					response = base64.StdEncoding.EncodeToString([]byte(input.Text))
@@ -131,12 +132,12 @@ func NewLLM(
 
 					err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
 					if err != nil {
-						panic(err)
+						return "", errors.Wrap(err, "failed to unmarshal input")
 					}
 
 					response, err = jwtdecode(input.Token)
 					if err != nil {
-						panic(err)
+						return "", errors.Wrap(err, "failed to decode JWT")
 					}
 				case "uuid":
 					response = uuid.New().String()
@@ -147,11 +148,11 @@ func NewLLM(
 
 					err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
 					if err != nil {
-						panic(err)
+						return "", errors.Wrap(err, "failed to create context")
 					}
 					ctx, err := quickjs.NewContext()
 					if err != nil {
-						panic(err)
+						return "", errors.Wrap(err, "failed to evaluate code")
 					}
 
 					res, _ := ctx.Eval(input.Code, nil)

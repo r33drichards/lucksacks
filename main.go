@@ -219,7 +219,7 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-		go func() {
+		go func(reqID string) {
 			if eventsAPIEvent.Type == slackevents.CallbackEvent {
 				// write 200 ok
 
@@ -233,7 +233,7 @@ func main() {
 					}
 					message, err := messageStore.CallLLM(threadTS, ev.Text)
 					if err != nil {
-						log.Println("Failed to call LLM:", err)
+						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
 					}
 					_, _, err = api.PostMessage(
 						ev.Channel,
@@ -241,7 +241,7 @@ func main() {
 						slack.MsgOptionTS(threadTS),
 					)
 					if err != nil {
-						log.Println("Failed to reply in thread:", err)
+						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread")
 					}
 				case *slackevents.MessageEvent:
 					log.Println(ev.Channel, ev.Text)
@@ -255,7 +255,7 @@ func main() {
 						}).Info("message event")
 						message, err := messageStore.CallLLM(ev.ThreadTimeStamp, ev.Text)
 						if err != nil {
-							log.Println("Failed to call LLM:", err)
+							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to call LLM")
 						}
 						_, _, err = api.PostMessage(
 							ev.Channel,
@@ -263,12 +263,12 @@ func main() {
 							slack.MsgOptionTS(ev.ThreadTimeStamp),
 						)
 						if err != nil {
-							log.Println("Failed to reply in thread (message event):", err)
+							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread (message event)")
 						}
 					}
 				}
 			}
-		}()
+		}(reqID)
 
 	})
 	// server hello world on /
