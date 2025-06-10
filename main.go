@@ -273,10 +273,10 @@ func main() {
 
 						msg := fmt.Sprintf("%s set %s to %s", userID, taskName, taskstatus)
 
-						channel := "C08T1F7GHAR" // test-bots
+						channel := "C07T9KYKUJU" // tasks
 						log.WithFields(log.Fields{"reqID": reqID, "listID": listID, "msg": msg}).Info("listID and msg")
 						channelHistory, err := api.GetConversationHistory(&slack.GetConversationHistoryParameters{
-							ChannelID: channel, // test-bots
+							ChannelID: channel, 
 							Limit:     100,
 						})
 						if err != nil {
