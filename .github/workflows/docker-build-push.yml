@@ -45,8 +45,8 @@ jobs:
               echo "$output"
               # run gofmt -w .
               gofmt -w .
-              git config user.email "github-actions[bot]@users.noreply.github.com"
-              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[fmt-bot]@users.noreply.github.com"
+              git config user.name "github-actions[fmt-bot]"
               # add changes to git
               git add .
               # commit changes
