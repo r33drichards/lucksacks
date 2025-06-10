@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
 
@@ -231,6 +232,74 @@ func main() {
 					callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID)
 				case *slackevents.MessageEvent:
 					log.Println(ev.Channel, ev.Text)
+					log.WithFields(log.Fields{"reqID": reqID, "channel": ev.Channel, "text": ev.Text, "thread": ev.ThreadTimeStamp, "user": ev.User}).Info("message event")
+					text := ev.Text
+					// if text starts with 34F1C711-9E95-4B6E-B898-0CD940057B0E event type
+					if strings.HasPrefix(text, "34F1C711-9E95-4B6E-B898-0CD940057B0E") {
+						// 34F1C711-9E95-4B6E-B898-0CD940057B0E event type
+						// {{{{inputs.Ft090RD6LWPL__list_id}}}}
+						// {{{{inputs.Ft090RD6LWPL__user_id}}}} set {{{{inputs.Ft090RD6LWPL__fields_name}}}} to {{{{inputs.Ft090RD6LWPL__fields_Col08SE07CK5X}}}}
+						// extract list id
+						// extract message
+						// look at $channel history and find most recent message containing the list id in a link like https://saphira-hq.slack.com/lists/T063KRC3CN8/F090H9ZV1PG
+						// if found, reply to the message in thread with the message
+						split := strings.Split(text, "\n")
+
+						index := map[int]string{}
+						for i, v := range split {
+							index[i] = v
+						}
+						// now I can safely check with ok
+						var listID string
+						var userID string
+						var taskName string
+						var taskstatus string
+						if v, ok := index[1]; ok {
+							listID = v
+						}
+						if v, ok := index[2]; ok {
+							userID = v
+						}
+						if v, ok := index[3]; ok {
+							taskName = v
+						}
+						if v, ok := index[4]; ok {
+							taskstatus = v
+						}
+						if taskName == "" {
+							// filter
+							return
+						}
+
+						msg := fmt.Sprintf("%s set %s to %s", userID, taskName, taskstatus)
+
+						channel := "C08T1F7GHAR" // test-bots
+						log.WithFields(log.Fields{"reqID": reqID, "listID": listID, "msg": msg}).Info("listID and msg")
+						channelHistory, err := api.GetConversationHistory(&slack.GetConversationHistoryParameters{
+							ChannelID: channel, // test-bots
+							Limit:     100,
+						})
+						if err != nil {
+							log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to get channel history")
+						}
+						for _, message := range channelHistory.Messages {
+							if strings.Contains(message.Text, listID) {
+								log.WithFields(log.Fields{"reqID": reqID, "message": message.Text}).Info("message found")
+								// reply to the message in thread with the message
+								_, _, err = api.PostMessage(
+									channel,
+									slack.MsgOptionText(msg, false),
+									slack.MsgOptionTS(message.Timestamp),
+								)
+								if err != nil {
+									log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to reply in thread")
+									sentry.CaptureException(err)
+								}
+								return
+							}
+
+						}
+					}
 					if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
 						log.WithFields(log.Fields{
 							"reqID":   reqID,
