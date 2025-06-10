@@ -50,6 +50,7 @@ jobs:
               # commit changes
               git commit -m "chore: format go files"
               # push changes
+              git push
             fi
           elif [ "${{ matrix.check }}" = "vet" ]; then
             go vet ./...
