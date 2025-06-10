@@ -276,7 +276,7 @@ func main() {
 						channel := "C07T9KYKUJU" // tasks
 						log.WithFields(log.Fields{"reqID": reqID, "listID": listID, "msg": msg}).Info("listID and msg")
 						channelHistory, err := api.GetConversationHistory(&slack.GetConversationHistoryParameters{
-							ChannelID: channel, 
+							ChannelID: channel,
 							Limit:     100,
 						})
 						if err != nil {
