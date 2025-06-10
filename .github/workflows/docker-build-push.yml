@@ -43,7 +43,13 @@ jobs:
             if [ -n "$output" ]; then
               echo "Go files must be formatted. Run 'gofmt -w .'"
               echo "$output"
-              exit 1
+              # run gofmt -w .
+              gofmt -w .
+              # add changes to git
+              git add .
+              # commit changes
+              git commit -m "chore: format go files"
+              # push changes
             fi
           elif [ "${{ matrix.check }}" = "vet" ]; then
             go vet ./...
