@@ -373,7 +373,13 @@ func callLLm(
 		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
 		_, _, err = api.PostMessage(
 			channel,
-			slack.MsgOptionText("Error: "+err.Error(), false),
+			slack.MsgOptionText(
+				"Error: "+err.Error() + fmt.Sprintf(
+					"\n\n%+v",
+					err,
+				),
+				false,
+			),
 			slack.MsgOptionTS(thread),
 		)
 		if err != nil {
@@ -415,6 +421,10 @@ func callLLm(
 		if err != nil {
 			sentry.CaptureException(err)
 			log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to loop")
+		}
+		if resp == nil {
+			log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter}).Info("resp is nil")
+			return
 		}
 		_, _, err = api.PostMessage(
 			channel,

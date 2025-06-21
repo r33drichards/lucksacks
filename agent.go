@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/rosbit/go-quickjs"
@@ -100,12 +101,11 @@ func handleMessage(
 	}
 
 	mesagesToStore := []anthropic.MessageParam{message.ToParam()}
-	if content != "" {
+	if strings.TrimSpace(content) != "" {
 		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
 	}
 	if len(toolResults) > 0 {
 		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
-
 	}
 
 	messageStore.AppendMessages(conversationID, mesagesToStore)
@@ -236,7 +236,16 @@ type SlackMessageStore struct {
 }
 
 func (s *SlackMessageStore) CallLLM(conversationID string, text string) (*LLMResponse, error) {
-	s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
+	if strings.TrimSpace(text) != "" {
+		s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
+	}
+
+	if len(s.messages[conversationID]) == 0 {
+		return &LLMResponse{
+			Message: "I can't respond to an empty message. Please provide some input.",
+			Loop:    false,
+		}, nil
+	}
 	message, err := s.llm.Prompt(
 		s.messages[conversationID],
 		s,
