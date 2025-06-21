@@ -19,7 +19,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rosbit/go-quickjs v0.6.0
 	github.com/sirupsen/logrus v1.9.0
-	github.com/slack-go/slack v0.9.1
+	github.com/slack-go/slack v0.17.1
 )
 
 require (
@@ -40,7 +40,6 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/rosbit/go-embedding-utils v0.4.1 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect

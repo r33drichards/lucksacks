@@ -217,7 +217,7 @@ func main() {
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
-		go func(reqID string) {
+		go func(reqID string, eventsAPIEvent slackevents.EventsAPIEvent) {
 			if eventsAPIEvent.Type == slackevents.CallbackEvent {
 				// write 200 ok
 
@@ -230,9 +230,28 @@ func main() {
 						threadTS = ev.TimeStamp
 					}
 					callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID)
+				case *slackevents.AssistantThreadStartedEvent:
+					log.WithFields(log.Fields{"reqID": reqID, "thread": ev.EventTimestamp}).Info("assistant thread started")
+					// Let's set some suggested prompts
+					err := api.SetAssistantThreadsSuggestedPrompts(
+						slack.AssistantThreadsSetSuggestedPromptsParameters{
+							ThreadTS: eventsAPIEvent.InnerEvent.Data.(*slackevents.AssistantThreadStartedEvent).AssistantThread.ThreadTimeStamp,
+							Prompts: []slack.AssistantThreadsPrompt{
+								{
+									Title:   "How many seconds are in a month? use js to calculate",
+									Message: "how many seconds are in a month? use js to calculate",
+								},
+							},
+							ChannelID: eventsAPIEvent.InnerEvent.Data.(*slackevents.AssistantThreadStartedEvent).AssistantThread.ChannelID,
+							Title:     "TODO :)",
+						})
+					if err != nil {
+						log.WithFields(log.Fields{"reqID": reqID, "error": err}).Error("Failed to set assistant thread suggested prompts")
+						sentry.CaptureException(err)
+					}
 				case *slackevents.MessageEvent:
 					log.Println(ev.Channel, ev.Text)
-					log.WithFields(log.Fields{"reqID": reqID, "channel": ev.Channel, "text": ev.Text, "thread": ev.ThreadTimeStamp, "user": ev.User}).Info("message event")
+					log.WithFields(log.Fields{"reqID": reqID, "channel": ev.Channel, "text": ev.Text, "thread": ev.ThreadTimeStamp, "user": ev.User, "channelType": ev.ChannelType}).Info("message event")
 					text := ev.Text
 					// if text starts with 34F1C711-9E95-4B6E-B898-0CD940057B0E event type
 					if strings.HasPrefix(text, "34F1C711-9E95-4B6E-B898-0CD940057B0E") {
@@ -300,7 +319,8 @@ func main() {
 
 						}
 					}
-					if ev.ThreadTimeStamp != "" && ev.User != "U090FSXLJ9Y" {
+					// handle AI app messages (message.im) and threaded messages
+					if (ev.ChannelType == "im" || ev.ThreadTimeStamp != "") && ev.User != "U090FSXLJ9Y" {
 						log.WithFields(log.Fields{
 							"reqID":   reqID,
 							"channel": ev.Channel,
@@ -308,11 +328,15 @@ func main() {
 							"thread":  ev.ThreadTimeStamp,
 							"user":    ev.User,
 						}).Info("message event")
-						callLLm(ev.ThreadTimeStamp, ev.Text, messageStore, ev.Channel, ev.ThreadTimeStamp, api, reqID)
+						threadTS := ev.ThreadTimeStamp
+						if threadTS == "" {
+							threadTS = ev.TimeStamp
+						}
+						callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID)
 					}
 				}
 			}
-		}(reqID)
+		}(reqID, eventsAPIEvent)
 
 	})
 	// server hello world on /
@@ -347,6 +371,16 @@ func callLLm(
 	if err != nil {
 		sentry.CaptureException(err)
 		log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to call LLM")
+		_, _, err = api.PostMessage(
+			channel,
+			slack.MsgOptionText("Error: "+err.Error(), false),
+			slack.MsgOptionTS(thread),
+		)
+		if err != nil {
+			sentry.CaptureException(err)
+			log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (message event)")
+		}
+		return
 	}
 	_, _, err = api.PostMessage(
 		channel,
