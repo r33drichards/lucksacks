@@ -161,7 +161,6 @@ func main() {
 		log.Fatalf("sentry.Init: %s", err)
 	}
 	log.SetFormatter(&log.JSONFormatter{})
-
 	log.WithFields(log.Fields{"string": "foo", "int": 1, "float": 1.1}).Info("My first event from golang to stdout")
 
 	api := slack.New(os.Getenv("SLACK_BOT_TOKEN"))
