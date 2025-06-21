@@ -426,7 +426,7 @@ func main() {
 						}
 					}
 					// handle AI app messages (message.im) and threaded messages
-					if (ev.ChannelType == "im" || ev.ThreadTimeStamp != "") && ev.User != "U090FSXLJ9Y" {
+					if ev.ChannelType == "im" {
 						log.WithFields(log.Fields{
 							"reqID":   reqID,
 							"channel": ev.Channel,
