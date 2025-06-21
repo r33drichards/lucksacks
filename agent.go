@@ -95,10 +95,9 @@ func handleMessage(
 				response = "Unknown tool: " + block.Name
 			}
 
-			response = strings.TrimSpace(response)
-
 			content += "\n" + block.Name + ": \n" + response
 			content = strings.TrimSpace(content)
+			response = strings.TrimSpace(response)
 			toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, response, false))
 
 		}

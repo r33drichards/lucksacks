@@ -164,7 +164,7 @@ func Test_handleMessage(t *testing.T) {
 				},
 				conversationID: "test",
 			},
-			want:    &LLMResponse{Message: "\nbase64: \ndGVzdA==", Loop: true},
+			want:    &LLMResponse{Message: "base64: \ndGVzdA==", Loop: true},
 			wantErr: false,
 			messageStoreState: map[string][]anthropic.MessageParam{
 				"test": {
