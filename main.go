@@ -332,6 +332,10 @@ func main() {
 						if threadTS == "" {
 							threadTS = ev.TimeStamp
 						}
+						if ev.SubType == "message_changed" {
+							log.WithFields(log.Fields{"reqID": reqID, "channel": ev.Channel, "text": ev.Text, "thread": ev.ThreadTimeStamp, "user": ev.User}).Info("message changed")
+							return
+						}
 						callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID)
 					}
 				}
@@ -421,6 +425,22 @@ func callLLm(
 		if err != nil {
 			sentry.CaptureException(err)
 			log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to loop")
+			_, _, err = api.PostMessage(
+				channel,
+				slack.MsgOptionText(
+					"Error: "+err.Error()+fmt.Sprintf(
+						"\n\n%+v",
+						err,
+					),
+					false,
+				),
+				slack.MsgOptionTS(thread),
+			)
+			if err != nil {
+				sentry.CaptureException(err)
+				log.WithFields(log.Fields{"reqID": reqID, "error": err, "stack": fmt.Sprintf("%+v", err)}).Error("Failed to reply in thread (loop)")
+			}
+			return
 		}
 		if resp == nil {
 			log.WithFields(log.Fields{"reqID": reqID, "thread": thread, "message": message, "counter": counter}).Info("resp is nil")

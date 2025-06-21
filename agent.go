@@ -87,25 +87,29 @@ func handleMessage(
 
 				res, err := ctx.Eval(input.Code, nil)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to evaluate code")
+					response = fmt.Sprintf("Error: %v", err)
+					break
 				}
 				response = fmt.Sprintf("%v", res)
 			default:
 				response = "Unknown tool: " + block.Name
 			}
 
+			response = strings.TrimSpace(response)
+
 			content += "\n" + block.Name + ": \n" + response
+			content = strings.TrimSpace(content)
 			toolResults = append(toolResults, anthropic.NewToolResultBlock(block.ID, response, false))
 
 		}
 	}
 
 	mesagesToStore := []anthropic.MessageParam{message.ToParam()}
-	if strings.TrimSpace(content) != "" {
-		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(content)))
-	}
 	if len(toolResults) > 0 {
 		mesagesToStore = append(mesagesToStore, anthropic.NewUserMessage(toolResults...))
+	}
+	if strings.TrimSpace(content) != "" {
+		mesagesToStore = append(mesagesToStore, anthropic.NewAssistantMessage(anthropic.NewTextBlock(strings.TrimSpace(content))))
 	}
 
 	messageStore.AppendMessages(conversationID, mesagesToStore)
@@ -194,11 +198,19 @@ the above script would return "hello"
 		Messages:  messages,
 		Tools:     tools,
 		Thinking: anthropic.ThinkingConfigParamUnion{
-			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 1024}},
+			OfEnabled: &anthropic.ThinkingConfigEnabledParam{BudgetTokens: 5_000}},
+		System: []anthropic.TextBlockParam{
+			{
+				Text: "your responses are going to be going to slack, so use that format for your responses",
+			},
+			{
+				Text: "text like this **bold** is not supported in slack, it just shows the starts, so use a different way to organize your text",
+			},
+		},
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "couldn't create message")
 	}
 	resp, err := handleMessage(message, messageStore, conversationID)
 	if err != nil {
@@ -237,12 +249,12 @@ type SlackMessageStore struct {
 
 func (s *SlackMessageStore) CallLLM(conversationID string, text string) (*LLMResponse, error) {
 	if strings.TrimSpace(text) != "" {
-		s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(text)))
+		s.messages[conversationID] = append(s.messages[conversationID], anthropic.NewUserMessage(anthropic.NewTextBlock(strings.TrimSpace(text))))
 	}
 
 	if len(s.messages[conversationID]) == 0 {
 		return &LLMResponse{
-			Message: "I can't respond to an empty message. Please provide some input.",
+			Message: "I can't respond to an empty message. Please provide some input. keep your outputs basic and text only since no formatting is applied.",
 			Loop:    false,
 		}, nil
 	}
@@ -278,7 +290,7 @@ func (s *SlackMessageStore) Loop(
 		conversationID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "couldn't call LLM")
 	}
 
 	return message, nil

@@ -174,7 +174,7 @@ func Test_handleMessage(t *testing.T) {
 						map[string]interface{}{"text": "test"},
 						"tool_use_id",
 					)),
-					anthropic.NewAssistantMessage(anthropic.NewToolResultBlock(
+					anthropic.NewUserMessage(anthropic.NewToolResultBlock(
 						"base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
 						"tool_use_id",
 						true,
