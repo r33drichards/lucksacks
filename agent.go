@@ -170,7 +170,13 @@ func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStor
 				Properties: map[string]interface{}{
 					"code": map[string]interface{}{
 						"type":        "string",
-						"description": "The JavaScript code to run",
+						"description": `The JavaScript code to run. console.log does not work. return the value at the end of the script to get the outcome of the sciprt
+console.log("hello world") // does not work 
+"hello" // this works
+
+
+the above script would return "hello"
+						`,
 					},
 				},
 			},
