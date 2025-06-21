@@ -2,24 +2,72 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/rosbit/go-quickjs"
 	"github.com/slack-go/slack"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/google/uuid"
 )
 
-func handleMessage(
+type ToolHandler interface {
+	GetName() string
+	HandleTool(
+		input json.RawMessage,
+	) (*string, error)
+}
+
+type messageHandler interface {
+	HandleMessage(
+		message *anthropic.Message,
+		messageStore MessageStore,
+		conversationID string,
+	) (*LLMResponse, error)
+}
+
+type AnthropicMessageHandler struct {
+	tools map[string]ToolHandler
+}
+
+func NewAnthropicMessageHandler(
+	tools []ToolHandler,
+) *AnthropicMessageHandler {
+	toolsMap := make(map[string]ToolHandler)
+	for _, tool := range tools {
+		toolsMap[tool.GetName()] = tool
+	}
+	return &AnthropicMessageHandler{
+		tools: toolsMap,
+	}
+}
+
+func (h *AnthropicMessageHandler) getTool(
+	name string,
+) ToolHandler {
+	if tool, ok := h.tools[name]; ok {
+		return tool
+	}
+	return nil
+}
+
+func (h *AnthropicMessageHandler) callTool(
+	name string,
+	input json.RawMessage,
+) (*string, error) {
+	tool := h.getTool(name)
+	if tool == nil {
+		return nil, errors.New("tool not found")
+	}
+	return tool.HandleTool(input)
+}
+
+func (h *AnthropicMessageHandler) HandleMessage(
 	message *anthropic.Message,
 	messageStore MessageStore,
 	conversationID string,
 ) (*LLMResponse, error) {
+
 	content := ""
 
 	for _, block := range message.Content {
@@ -39,61 +87,16 @@ func handleMessage(
 		switch variant := block.AsAny().(type) {
 		case anthropic.ToolUseBlock:
 
-			var response string
-			switch block.Name {
-			case "base64":
-				var input struct {
-					Text string `json:"text"`
-				}
-
-				raw := variant.Input
-
-				err := json.Unmarshal(raw, &input)
-
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to unmarshal input")
-				}
-
-				response = base64.StdEncoding.EncodeToString([]byte(input.Text))
-			case "jwtdecode":
-				var input struct {
-					Token string `json:"token"`
-				}
-
-				err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to unmarshal input")
-				}
-
-				response, err = jwtdecode(input.Token)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to decode JWT")
-				}
-			case "uuid":
-				response = uuid.New().String()
-			case "quickjs":
-				var input struct {
-					Code string `json:"code"`
-				}
-
-				err := json.Unmarshal([]byte(variant.JSON.Input.Raw()), &input)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to create context")
-				}
-				ctx, err := quickjs.NewContext()
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to create context")
-				}
-
-				res, err := ctx.Eval(input.Code, nil)
-				if err != nil {
-					response = fmt.Sprintf("Error: %v", err)
-					break
-				}
-				response = fmt.Sprintf("%v", res)
-			default:
-				response = "Unknown tool: " + block.Name
+			maybeResponse, err := h.callTool(block.Name, variant.Input)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to call tool")
 			}
+
+			if maybeResponse == nil {
+				return nil, errors.New("tool returned nil")
+			}
+
+			response := *maybeResponse
 
 			content += "\n" + block.Name + ": \n" + response
 			content = strings.TrimSpace(content)
@@ -116,6 +119,7 @@ func handleMessage(
 		Message: content,
 		Loop:    len(toolResults) > 0,
 	}, nil
+
 }
 
 // LLMInterface defines the interface for LLMs with a Prompt method.
@@ -129,7 +133,18 @@ type LLMInterface interface {
 
 // LLM is a struct that holds the anthropic client and any other config.
 type LLM struct {
-	client anthropic.Client
+	client         anthropic.Client
+	messageHandler messageHandler
+}
+
+func newLLM(
+	client anthropic.Client,
+	messageHandler messageHandler,
+) *LLM {
+	return &LLM{
+		client:         client,
+		messageHandler: messageHandler,
+	}
 }
 
 // Prompt implements the LLMInterface for LLM.
@@ -211,7 +226,7 @@ the above script would return "hello"
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't create message")
 	}
-	resp, err := handleMessage(message, messageStore, conversationID)
+	resp, err := l.messageHandler.HandleMessage(message, messageStore, conversationID)
 	if err != nil {
 		return nil, errors.Wrap(err, "couldn't handle message")
 	}
@@ -219,8 +234,8 @@ the above script would return "hello"
 }
 
 // NewLLM returns a new LLM struct implementing LLMInterface.
-func NewLLM(client anthropic.Client) *LLM {
-	return &LLM{client: client}
+func NewLLM(client anthropic.Client, messageHandler messageHandler) *LLM {
+	return &LLM{client: client, messageHandler: messageHandler}
 }
 
 type LLMResponse struct {

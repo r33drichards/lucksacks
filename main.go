@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/pkg/errors"
+	"github.com/rosbit/go-quickjs"
 
 	"github.com/google/uuid"
 	_ "github.com/joho/godotenv/autoload"
@@ -48,10 +50,75 @@ func logErrMsgSlack(w http.ResponseWriter, msg string) {
 	}
 }
 
+type jwtDecodeTool struct {
+}
+
+func (t *jwtDecodeTool) GetName() string {
+	return "jwtdecode"
+}
+
+func (t *jwtDecodeTool) HandleTool(input json.RawMessage) (*string, error) {
+	var toolInput struct {
+		Token string `json:"token"`
+	}
+
+	err := json.Unmarshal(input, &toolInput)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := jwtdecode(toolInput.Token)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode JWT")
+	}
+	return &response, nil
+}
+
+type quickjsTool struct {
+}
+
+func (t *quickjsTool) GetName() string {
+	return "quickjs"
+}
+
+func (t *quickjsTool) HandleTool(input json.RawMessage) (*string, error) {
+	var toolInput struct {
+		Code string `json:"code"`
+	}
+
+	err := json.Unmarshal(input, &toolInput)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create context")
+	}
+	ctx, err := quickjs.NewContext()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create context")
+	}
+
+	res, err := ctx.Eval(toolInput.Code, nil)
+	if err != nil {
+		// js errors come back as err
+		response := fmt.Sprintf("Error: %v", err)
+		return &response, nil
+	}
+	response := fmt.Sprintf("%v", res)
+	return &response, nil
+}
+
 func main() {
 	anthropicClient := anthropic.NewClient()
 
-	messageStore := NewSlackMessageStore(NewLLM(anthropicClient))
+	messageStore := NewSlackMessageStore(
+		NewLLM(
+			anthropicClient,
+			NewAnthropicMessageHandler(
+				[]ToolHandler{
+					&jwtDecodeTool{},
+					&quickjsTool{},
+				},
+			),
+		),
+	)
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn: "https://7a6c1d7fa62d70dffc54d0d4d8a92efb@o4507134751408128.ingest.us.sentry.io/4509460668809216",
