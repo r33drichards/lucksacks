@@ -18,6 +18,44 @@ type ToolHandler interface {
 	) (*string, error)
 }
 
+func newTemplateToolHandler(
+	name string,
+	handleTool func(input json.RawMessage) (*string, error),
+) ToolHandler {
+	return &templateToolHandler{
+		name:       name,
+		handleTool: handleTool,
+	}
+}
+
+type templateToolHandler struct {
+	name       string
+	handleTool func(input json.RawMessage) (*string, error)
+}
+
+func (h *templateToolHandler) GetName() string {
+	return h.name
+}
+
+func (h *templateToolHandler) HandleTool(input json.RawMessage) (*string, error) {
+	return h.handleTool(input)
+}
+
+func CreateToolHandler[T any](
+	name string,
+	handleTool func(input T) (*string, error),
+) ToolHandler {
+	handler := func(input json.RawMessage) (*string, error) {
+		var toolInput T
+		err := json.Unmarshal(input, &toolInput)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to unmarshal input")
+		}
+		return handleTool(toolInput)
+	}
+	return newTemplateToolHandler(name, handler)
+}
+
 type messageHandler interface {
 	HandleMessage(
 		message *anthropic.Message,

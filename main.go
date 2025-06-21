@@ -50,72 +50,40 @@ func logErrMsgSlack(w http.ResponseWriter, msg string) {
 	}
 }
 
-type jwtDecodeTool struct {
-}
-
-func (t *jwtDecodeTool) GetName() string {
-	return "jwtdecode"
-}
-
-func (t *jwtDecodeTool) HandleTool(input json.RawMessage) (*string, error) {
-	var toolInput struct {
-		Token string `json:"token"`
-	}
-
-	err := json.Unmarshal(input, &toolInput)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := jwtdecode(toolInput.Token)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode JWT")
-	}
-	return &response, nil
-}
-
-type quickjsTool struct {
-}
-
-func (t *quickjsTool) GetName() string {
-	return "quickjs"
-}
-
-func (t *quickjsTool) HandleTool(input json.RawMessage) (*string, error) {
-	var toolInput struct {
-		Code string `json:"code"`
-	}
-
-	err := json.Unmarshal(input, &toolInput)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create context")
-	}
-	ctx, err := quickjs.NewContext()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create context")
-	}
-
-	res, err := ctx.Eval(toolInput.Code, nil)
-	if err != nil {
-		// js errors come back as err
-		response := fmt.Sprintf("Error: %v", err)
-		return &response, nil
-	}
-	response := fmt.Sprintf("%v", res)
-	return &response, nil
-}
-
 func main() {
 	anthropicClient := anthropic.NewClient()
-
+	var tools = []ToolHandler{
+		CreateToolHandler("jwtdecode", func(input struct {
+			Token string `json:"token"`
+		}) (*string, error) {
+			response, err := jwtdecode(input.Token)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode JWT")
+			}
+			return &response, nil
+		}),
+		CreateToolHandler("quickjs", func(input struct {
+			Code string `json:"code"`
+		}) (*string, error) {
+			ctx, err := quickjs.NewContext()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to create context")
+			}
+			res, err := ctx.Eval(input.Code, nil)
+			if err != nil {
+				// js errors come back as err
+				response := fmt.Sprintf("Error: %v", err)
+				return &response, nil
+			}
+			response := fmt.Sprintf("%v", res)
+			return &response, nil
+		}),
+	}
 	messageStore := NewSlackMessageStore(
 		NewLLM(
 			anthropicClient,
 			NewAnthropicMessageHandler(
-				[]ToolHandler{
-					&jwtDecodeTool{},
-					&quickjsTool{},
-				},
+				tools,
 			),
 		),
 	)
