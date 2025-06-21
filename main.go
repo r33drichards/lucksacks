@@ -1,12 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	_ "github.com/lib/pq"
 	"github.com/pkg/errors"
 	"github.com/rosbit/go-quickjs"
 
@@ -76,6 +78,70 @@ func main() {
 				return &response, nil
 			}
 			response := fmt.Sprintf("%v", res)
+			return &response, nil
+		}),
+		CreateToolHandler("postgres_query", func(input struct {
+			Query string `json:"query"`
+		}) (*string, error) {
+			dbURL := os.Getenv("DATABASE_URL")
+			if dbURL == "" {
+				dbURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+			}
+			// TODO: use a proper connection string from config
+			db, err := sql.Open("postgres", dbURL)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to connect to database")
+			}
+			defer db.Close()
+
+			rows, err := db.Query(input.Query)
+			if err != nil {
+				// To be friendlier to the LLM, we'll return db errors as part of the response string
+				response := fmt.Sprintf("Error: %v", err)
+				return &response, nil
+			}
+			defer rows.Close()
+
+			columns, err := rows.Columns()
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get columns")
+			}
+
+			var results []map[string]interface{}
+			for rows.Next() {
+				values := make([]interface{}, len(columns))
+				valuePtrs := make([]interface{}, len(columns))
+				for i := range columns {
+					valuePtrs[i] = &values[i]
+				}
+
+				if err := rows.Scan(valuePtrs...); err != nil {
+					return nil, errors.Wrap(err, "failed to scan row")
+				}
+
+				rowMap := make(map[string]interface{})
+				for i, col := range columns {
+					val := values[i]
+
+					if b, ok := val.([]byte); ok {
+						rowMap[col] = string(b)
+					} else {
+						rowMap[col] = val
+					}
+				}
+				results = append(results, rowMap)
+			}
+
+			if err := rows.Err(); err != nil {
+				return nil, errors.Wrap(err, "error during rows iteration")
+			}
+
+			jsonResult, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to marshal result to JSON")
+			}
+
+			response := string(jsonResult)
 			return &response, nil
 		}),
 	}
@@ -275,6 +341,11 @@ func main() {
 								{
 									Title:   "How many seconds are in a month? use js to calculate",
 									Message: "how many seconds are in a month? use js to calculate",
+								},
+								{
+									// TODO: add a prompt to get the database schema
+									Title:   "Get the database schema",
+									Message: "Get the database schema",
 								},
 							},
 							ChannelID: eventsAPIEvent.InnerEvent.Data.(*slackevents.AssistantThreadStartedEvent).AssistantThread.ChannelID,

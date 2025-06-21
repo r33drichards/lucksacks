@@ -189,18 +189,6 @@ func newLLM(
 func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStore, conversationID string) (*LLMResponse, error) {
 	toolParams := []anthropic.ToolParam{
 		{
-			Name:        "base64",
-			Description: anthropic.String("Base64 encode a string"),
-			InputSchema: anthropic.ToolInputSchemaParam{
-				Properties: map[string]interface{}{
-					"text": map[string]interface{}{
-						"type":        "string",
-						"description": "The text to encode",
-					},
-				},
-			},
-		},
-		{
 			Name:        "jwtdecode",
 			Description: anthropic.String("Decode a JWT token"),
 			InputSchema: anthropic.ToolInputSchemaParam{
@@ -210,13 +198,6 @@ func (l *LLM) Prompt(messages []anthropic.MessageParam, messageStore MessageStor
 						"description": "The JWT token to decode",
 					},
 				},
-			},
-		},
-		{
-			Name:        "uuid",
-			Description: anthropic.String("Generate a UUID"),
-			InputSchema: anthropic.ToolInputSchemaParam{
-				Properties: map[string]interface{}{},
 			},
 		},
 		{
@@ -233,6 +214,18 @@ console.log("hello world") // does not work
 
 the above script would return "hello"
 						`,
+					},
+				},
+			},
+		},
+		{
+			Name:        "postgres_query",
+			Description: anthropic.String("Run a PostgreSQL query"),
+			InputSchema: anthropic.ToolInputSchemaParam{
+				Properties: map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "The PostgreSQL query to run. inspect the database schema to see what tables and columns are available. use the schema to build your query.",
 					},
 				},
 			},

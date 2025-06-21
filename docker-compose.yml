@@ -1,10 +1,13 @@
 version: '3'
 
 services:
-  app:
-    build: .
-    env_file: .env
-#    volumes:
-#      - ./popular.txt:/popular.txt
+  db:
+    image: postgres
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
     ports:
-      - 3000:3000
+      - "5432:5432"
+

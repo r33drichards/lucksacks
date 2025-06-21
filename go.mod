@@ -39,6 +39,7 @@ require (
 	github.com/bcicen/bfstree v0.0.0-20180121191807-11ea469698a6 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/lib/pq v1.10.9 // indirect
 	github.com/rosbit/go-embedding-utils v0.4.1 // indirect
 	github.com/tidwall/gjson v1.14.4 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
