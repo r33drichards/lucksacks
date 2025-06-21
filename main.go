@@ -374,7 +374,7 @@ func callLLm(
 		_, _, err = api.PostMessage(
 			channel,
 			slack.MsgOptionText(
-				"Error: "+err.Error() + fmt.Sprintf(
+				"Error: "+err.Error()+fmt.Sprintf(
 					"\n\n%+v",
 					err,
 				),
