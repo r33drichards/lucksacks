@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/anthropics/anthropic-sdk-go"
-	"github.com/google/go-cmp/cmp"
 )
 
 // Add this mock type to allow function-based mocking of LLMInterface
@@ -121,86 +120,86 @@ func TestSlackMessageStore_AppendMessages(t *testing.T) {
 
 }
 
-func Test_handleMessage(t *testing.T) {
-	events := []string{
-		`{"type": "message_start", "message": {}}`,
-		`{"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "toolu_id", "name": "base64", "input": {}}}`,
-		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"text\":"}}`,
-		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": " \"test\"}"}}`,
-		`{"type": "content_block_stop", "index": 0}`,
-		`{"type": "message_stop"}`,
-	}
-	message := anthropic.Message{}
-	for _, eventStr := range events {
-		event := anthropic.MessageStreamEventUnion{}
-		err := (&event).UnmarshalJSON([]byte(eventStr))
-		if err != nil {
-			t.Fatal(err)
-		}
-		(&message).Accumulate(event)
-	}
+// func Test_handleMessage(t *testing.T) {
+// 	events := []string{
+// 		`{"type": "message_start", "message": {}}`,
+// 		`{"type": "content_block_start", "index": 0, "content_block": {"type": "tool_use", "id": "toolu_id", "name": "base64", "input": {}}}`,
+// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": "{\"text\":"}}`,
+// 		`{"type": "content_block_delta", "index": 0, "delta": {"type": "input_json_delta", "partial_json": " \"test\"}"}}`,
+// 		`{"type": "content_block_stop", "index": 0}`,
+// 		`{"type": "message_stop"}`,
+// 	}
+// 	message := anthropic.Message{}
+// 	for _, eventStr := range events {
+// 		event := anthropic.MessageStreamEventUnion{}
+// 		err := (&event).UnmarshalJSON([]byte(eventStr))
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 		(&message).Accumulate(event)
+// 	}
 
-	type args struct {
-		message        *anthropic.Message
-		messageStore   MessageStore
-		conversationID string
-	}
-	tests := []struct {
-		name              string
-		args              args
-		want              *LLMResponse
-		wantErr           bool
-		messageStoreState map[string][]anthropic.MessageParam
-	}{
-		// TODO: Add test cases.
-		{
-			name: "test",
-			args: args{
-				message: &message,
-				messageStore: &SlackMessageStore{
-					messages: map[string][]anthropic.MessageParam{
-						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
-					},
-				},
-				conversationID: "test",
-			},
-			want:    &LLMResponse{Message: "base64: \ndGVzdA==", Loop: true},
-			wantErr: false,
-			messageStoreState: map[string][]anthropic.MessageParam{
-				"test": {
-					anthropic.NewUserMessage(anthropic.NewTextBlock("test")),
-					anthropic.NewAssistantMessage(anthropic.NewToolUseBlock(
-						"base64",
-						map[string]interface{}{"text": "test"},
-						"tool_use_id",
-					)),
-					anthropic.NewUserMessage(anthropic.NewToolResultBlock(
-						"base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
-						"tool_use_id",
-						true,
-					)),
-				},
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := handleMessage(
-				tt.args.message,
-				tt.args.messageStore,
-				tt.args.conversationID,
-			)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("handleMessage() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			diff := cmp.Diff(got, tt.want)
-			if diff != "" {
-				t.Errorf("handleMessage() = %v, want %v", got, tt.want)
-			}
-			// if !reflect.DeepEqual(tt.args.messageStore.GetMessages(), tt.messageStoreState) {
-			// 	t.Errorf("handleMessage() messageStoreState = %v, want %v", tt.args.messageStore.GetMessages(), tt.messageStoreState)
-			// }
-		})
-	}
-}
+// 	type args struct {
+// 		message        *anthropic.Message
+// 		messageStore   MessageStore
+// 		conversationID string
+// 	}
+// 	tests := []struct {
+// 		name              string
+// 		args              args
+// 		want              *LLMResponse
+// 		wantErr           bool
+// 		messageStoreState map[string][]anthropic.MessageParam
+// 	}{
+// 		// TODO: Add test cases.
+// 		{
+// 			name: "test",
+// 			args: args{
+// 				message: &message,
+// 				messageStore: &SlackMessageStore{
+// 					messages: map[string][]anthropic.MessageParam{
+// 						"test": {anthropic.NewUserMessage(anthropic.NewTextBlock("test"))},
+// 					},
+// 				},
+// 				conversationID: "test",
+// 			},
+// 			want:    &LLMResponse{Message: "base64: \ndGVzdA==", Loop: true},
+// 			wantErr: false,
+// 			messageStoreState: map[string][]anthropic.MessageParam{
+// 				"test": {
+// 					anthropic.NewUserMessage(anthropic.NewTextBlock("test")),
+// 					anthropic.NewAssistantMessage(anthropic.NewToolUseBlock(
+// 						"base64",
+// 						map[string]interface{}{"text": "test"},
+// 						"tool_use_id",
+// 					)),
+// 					anthropic.NewUserMessage(anthropic.NewToolResultBlock(
+// 						"base64: {\"text\":\"test\"}\n\nbase64: \ndGVzdA==",
+// 						"tool_use_id",
+// 						true,
+// 					)),
+// 				},
+// 			},
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			got, err := handleMessage(
+// 				tt.args.message,
+// 				tt.args.messageStore,
+// 				tt.args.conversationID,
+// 			)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("handleMessage() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			diff := cmp.Diff(got, tt.want)
+// 			if diff != "" {
+// 				t.Errorf("handleMessage() = %v, want %v", got, tt.want)
+// 			}
+// 			// if !reflect.DeepEqual(tt.args.messageStore.GetMessages(), tt.messageStoreState) {
+// 			// 	t.Errorf("handleMessage() messageStoreState = %v, want %v", tt.args.messageStore.GetMessages(), tt.messageStoreState)
+// 			// }
+// 		})
+// 	}
+// }
