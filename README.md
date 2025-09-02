@@ -8,36 +8,13 @@ launch development server with:
 docker-compose up -d
 ```
 
-
 ## create tunnel for slack
 
-
 ```
- nix shell nixpkgs#cloudflared -c cloudflared tunnel --url http://localhost:3333  
+nix shell nixpkgs#cloudflared -c cloudflared tunnel --url http://localhost:3333
 ```
 
-
-
-
-
-navigate to your [app management
-dashboard](https://api.slack.com/apps) on slack, and slack the bot
-application that is being developed.
-
-under the *Features* sidebar, there is a menu option called `Slash
-Commands`. Select that menu option for a list of Slash commands for
-that current bot. 
-
-Edit the command that is being developed to use the ngrok url, from
-our screenshot it is: `https://3475afdd4195.ngrok.io`. Note that our
-web server serves slash commands under the path `/slash`.
-
-
-![slack slash command menu](./assets/edit-command.png)
-
-save your changes and test your command in slack
-
-## rebuild webserver
+## Rebuild webserver
 
 ```
 docker-compose up --build -d app
@@ -54,26 +31,46 @@ docker-compose logs -tf app
 docker-compose restart ngrok
 ```
 
-
-
 # k8s deployment
 
 ```
-      yes y | flux bootstrap git \
-        --url=ssh://git@github.com/r33drichards/lucksacks.git \
-        --branch=main \
-        --path=charts \
-        --namespace=default \
-        --private-key-file=/Users/robertwendt/.ssh/id_ed25519 
-
+yes y | flux bootstrap git \
+--url=ssh://git@github.com/r33drichards/lucksacks.git \
+--branch=main \
+--path=charts \
+--namespace=default \
+--private-key-file=/Users/robertwendt/.ssh/id_ed25519
 ```
 
-## create secret from .env file 
-
+## create secret from .env file
 ```sh
-# delete if it already exists
 kubectl delete secret lucksacks-secret
-
-# create secret from .env file
 kubectl create secret generic lucksacks-secret --from-env-file=.env
 ```
+
+# Tailscale IP Address Detection Feature
+
+This feature adds the ability to detect IP addresses mentioned in Slack messages and match them against devices on your Tailscale tailnet. When an IP address mentioned in a message matches a device on your tailnet, the bot will reply in the thread with the device name.
+
+## Setup
+
+1. Add the following environment variables to your `.env` file:
+
+```
+TAILSCALE_API_KEY=your_api_key
+TAILSCALE_TAILNET_ID=your_tailnet_id
+```
+
+You can obtain your Tailscale API key from the [Tailscale admin console](https://login.tailscale.com/admin/settings/keys).
+Your tailnet ID is usually your Tailscale account name, which can be found in the URL of your Tailscale admin console: `https://login.tailscale.com/admin/machines?tailnet=YOUR_TAILNET_ID`.
+
+## How It Works
+
+1. When a message is received in a channel, the bot scans the message for IP addresses using regular expressions.
+2. For each detected IP address, the bot checks if it matches an IP address of a device on your tailnet.
+3. If a match is found, the bot replies in the thread with a message indicating which device the IP address belongs to.
+
+## Example
+
+User: "Can someone check if 100.100.100.100 is online?"
+Bot: "IP address 100.100.100.100 belongs to device `office-laptop` on your tailnet."

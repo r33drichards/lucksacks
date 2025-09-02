@@ -26,6 +26,7 @@ import (
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
+	"lucksacks/tailscale"
 )
 
 //go:embed docs/tz.md
@@ -163,6 +164,15 @@ func main() {
 	log.SetFormatter(&log.JSONFormatter{})
 	log.WithFields(log.Fields{"string": "foo", "int": 1, "float": 1.1}).Info("My first event from golang to stdout")
 
+
+	// Initialize Tailscale client
+	tailscaleClient, err := tailscale.NewTailscaleClient()
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+			"stack": fmt.Sprintf("%+v", err),
+		}).Error("Failed to initialize Tailscale client")
+	}
 	api := slack.New(os.Getenv("SLACK_BOT_TOKEN"))
 	signingSecret := os.Getenv("SLACK_SIGNING_SECRET")
 
@@ -440,6 +450,34 @@ func main() {
 						if ev.SubType == "message_changed" {
 							log.WithFields(log.Fields{"reqID": reqID, "channel": ev.Channel, "text": ev.Text, "thread": ev.ThreadTimeStamp, "user": ev.User}).Info("message changed")
 							return
+
+						// Detect IP addresses in the message
+						if tailscaleClient != nil {
+							ipAddresses := tailscale.ExtractIPAddresses(ev.Text)
+							for _, ip := range ipAddresses {
+								// Check if the IP address is on the tailnet
+								device, err := tailscaleClient.FindDeviceByIP(ip)
+								if err != nil {
+									log.WithFields(log.Fields{
+										"reqID": reqID,
+										"error": err,
+										"ip":    ip,
+									}).Error("Failed to check IP address against tailnet")
+									continue
+								}
+
+								// If the device is found, reply with the device name
+								if device != nil {
+									reply := fmt.Sprintf("IP address %s belongs to device `%s` on your tailnet.", ip, device.Name)
+									_, _, err = api.PostMessage(
+										ev.Channel,
+										slack.MsgOptionText(reply, false),
+										slack.MsgOptionTS(threadTS),
+									)
+									log.WithFields(log.Fields{"reqID": reqID, "ip": ip, "device": device.Name}).Info("Found device for IP address")
+								}
+							}
+						}
 						}
 						callLLm(threadTS, ev.Text, messageStore, ev.Channel, threadTS, api, reqID)
 					}
